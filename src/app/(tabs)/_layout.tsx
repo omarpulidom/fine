@@ -1,5 +1,6 @@
 import { Redirect, Tabs } from "expo-router";
 import { TabBar } from "@/components/Elements/TabBar";
+import { Header } from "@/components/Elements/Header";
 import { useAuth } from "@/components/Providers/AuthProvider";
 
 export default function TabsLayout() {
@@ -13,8 +14,8 @@ export default function TabsLayout() {
     <Tabs
       tabBar={(props) => <TabBar {...props} />}
       screenOptions={{
-        headerShown: false,
-        animation: "shift",
+        headerShown: true,
+        header: () => <Header />,
       }}
     >
       <Tabs.Screen

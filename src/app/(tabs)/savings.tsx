@@ -2,8 +2,10 @@ import { View, Text } from "react-native";
 
 export default function SavingsScreen() {
   return (
-    <View className="flex-1 justify-center items-center bg-gray-50">
-      <Text className="text-2xl font-bold text-gray-900">Savings</Text>
+    <View className="flex-1 justify-center items-center bg-secondary-800">
+      <Text className="text-2xl font-montserrat-bold text-light-900">
+        Savings
+      </Text>
     </View>
   );
 }
