@@ -1,14 +1,13 @@
-import '../global.css'
-import { useFonts } from '@expo-google-fonts/montserrat'
-import { Stack } from 'expo-router'
-import * as SplashScreen from 'expo-splash-screen'
-import { StatusBar } from 'expo-status-bar'
-import { useEffect } from 'react'
-import { GestureHandlerRootView } from 'react-native-gesture-handler'
-import { AppFonts } from '@/components/fonts/fonts'
-import { AppProviders } from '@/components/Providers/AppProviders'
+import "../global.css";
+import { useFonts } from "@expo-google-fonts/montserrat";
+import { Stack } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
+import { useEffect } from "react";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { AppFonts } from "@/components/fonts/fonts";
+import { AppProviders } from "@/components/Providers/AppProviders";
 
-SplashScreen.preventAutoHideAsync()
+SplashScreen.preventAutoHideAsync();
 
 function RootStack() {
   return (
@@ -17,25 +16,22 @@ function RootStack() {
         headerShown: false,
       }}
     />
-  )
+  );
 }
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({
     ...AppFonts,
-  })
+  });
 
   useEffect(() => {
     if (loaded || error) {
-      SplashScreen.hideAsync()
+      SplashScreen.hideAsync();
     }
-  }, [
-    loaded,
-    error,
-  ])
+  }, [loaded, error]);
 
   if (!loaded && !error) {
-    return null
+    return null;
   }
 
   return (
@@ -44,10 +40,9 @@ export default function RootLayout() {
         flex: 1,
       }}
     >
-      <StatusBar hidden={true} backgroundColor={'transparent'} />
       <AppProviders>
         <RootStack />
       </AppProviders>
     </GestureHandlerRootView>
-  )
+  );
 }
