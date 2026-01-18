@@ -51,7 +51,7 @@ const tabNames = ["index", "stats", "savings", "debts"];
 export function TabBar({ state, navigation }: BottomTabBarProps) {
   return (
     <View
-      className="absolute bottom-0 left-0 right-0 pb-8 flex-row justify-center"
+      className="absolute bottom-0 left-0 right-0 pb-12 flex-row justify-center"
       style={{
         shadowColor: Colors.secondary[800],
         shadowOffset: { width: 0, height: 4 },
@@ -64,7 +64,7 @@ export function TabBar({ state, navigation }: BottomTabBarProps) {
         <View className="flex-row justify-center items-center gap-1 p-1 ">
           {tabNames.map((tabName) => {
             const routeIndex = state.routes.findIndex(
-              (route) => route.name === tabName
+              (route) => route.name === tabName,
             );
             if (routeIndex === -1) return null;
 
