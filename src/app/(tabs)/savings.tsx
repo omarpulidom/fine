@@ -140,7 +140,7 @@ export default function SavingsScreen() {
                 Carro
               </Text>
               {/* Amounts */}
-              <View className="flex-col gap-2 my-2">
+              <View className="flex-col gap-1 my-2">
                 <View className="flex-row justify-between items-center">
                   <Text className="font-montserrat-medium text-[24px] text-light-800">
                     $4,112
@@ -179,7 +179,7 @@ export default function SavingsScreen() {
                 Comida
               </Text>
               {/* Amounts */}
-              <View className="flex-col gap-2 my-2">
+              <View className="flex-col gap-1 my-2">
                 <View className="flex-row justify-between items-center">
                   <Text className="font-montserrat-medium text-[24px] text-light-800">
                     $647
@@ -218,7 +218,7 @@ export default function SavingsScreen() {
                 Moto
               </Text>
               {/* Amounts */}
-              <View className="flex-col gap-2 my-2">
+              <View className="flex-col gap-1 my-2">
                 <View className="flex-row justify-between items-center">
                   <Text className="font-montserrat-medium text-[24px] text-light-800">
                     $45,112
@@ -289,7 +289,7 @@ export default function SavingsScreen() {
                 Carro
               </Text>
               {/* Amounts */}
-              <View className="flex-col gap-2 my-2">
+              <View className="flex-col gap-1 my-2">
                 <View className="flex-row justify-between items-center">
                   <Text className="font-montserrat-medium text-[24px] text-light-800">
                     $3,450
@@ -328,7 +328,7 @@ export default function SavingsScreen() {
                 Comida
               </Text>
               {/* Amounts */}
-              <View className="flex-col gap-2 my-2">
+              <View className="flex-col gap-1 my-2">
                 <View className="flex-row justify-between items-center">
                   <Text className="font-montserrat-medium text-[24px] text-light-800">
                     $2,890
@@ -367,7 +367,7 @@ export default function SavingsScreen() {
                 Transporte
               </Text>
               {/* Amounts */}
-              <View className="flex-col gap-2 my-2">
+              <View className="flex-col gap-1 my-2">
                 <View className="flex-row justify-between items-center">
                   <Text className="font-montserrat-medium text-[24px] text-light-800">
                     $1,234
