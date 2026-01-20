@@ -10,3 +10,6 @@ export { CircularProgress } from "./CircularProgress";
 export { Header } from "./Header";
 export { TabBar } from "./TabBar";
 export { Dropdown } from "./Dropdown";
+export { ScreenTitle } from "./ScreenTitle";
+export { ChipSelector } from "./ChipSelector";
+export { AlertBadge } from "./AlertBadge";

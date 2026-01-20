@@ -1,7 +1,7 @@
 import { View, Text } from "react-native";
 import * as Icon from "phosphor-react-native";
 import { Colors } from "@/components/colors";
-import { CircularProgress } from "@/components/UI/Common";
+import { CircularProgress } from "@/components/ui/Common";
 import type { IconComponent } from "@/types/finance.types";
 
 interface MiniStatCardProps {

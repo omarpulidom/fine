@@ -1,12 +1,18 @@
-import { View, Text, ScrollView, TouchableOpacity } from "react-native";
+import { View, Text, ScrollView } from "react-native";
 import * as Icon from "phosphor-react-native";
-import { Dropdown, ManageButton } from "@/components/UI/Common";
+import {
+  Dropdown,
+  ManageButton,
+  ScreenTitle,
+  ChipSelector,
+  AlertBadge,
+} from "@/components/ui/Common";
 import {
   StatSection,
   AverageCard,
   CircularProgressItem,
   MiniStatCard,
-} from "@/components/UI/Blocks";
+} from "@/components/ui/Blocks";
 import { useState } from "react";
 import type { IconComponent } from "@/types/finance.types";
 
@@ -39,12 +45,11 @@ const BUDGET_ICONS: ProgressIcon[] = [
 
 export default function StatsScreen() {
   const [rangeOfTimeValue, setRangeOfTimeValue] = useState<string | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<string>(MONTHS[0]);
 
   return (
     <ScrollView className="flex-1 px-7 pt-4 bg-secondary-800">
-      <Text className="text-[20px] font-montserrat-medium text-primary-600">
-        Stats
-      </Text>
+      <ScreenTitle title="Stats" />
 
       {/* Data metrics */}
       <View className="border border-secondary-700 rounded-3xl pt-7 px-4 pb-4 my-6">
@@ -86,25 +91,12 @@ export default function StatsScreen() {
         </View>
 
         {/* Month Buttons */}
-        <View className="flex-row gap-1 mb-4 items-center justify-center">
-          {MONTHS.map((month, idx) => (
-            <TouchableOpacity
-              key={month}
-              className={`px-3 py-2 rounded-full ${
-                idx === 0
-                  ? "bg-primary-700"
-                  : "bg-secondary-800 border border-secondary-700"
-              }`}
-            >
-              <Text
-                className={`text-[12px] font-montserrat-medium ${
-                  idx === 0 ? "text-light-900" : "text-secondary-500"
-                }`}
-              >
-                {month}
-              </Text>
-            </TouchableOpacity>
-          ))}
+        <View className="mb-4">
+          <ChipSelector
+            options={MONTHS}
+            selected={selectedMonth}
+            onSelect={setSelectedMonth}
+          />
         </View>
 
         {/* Average Cards */}
@@ -164,9 +156,13 @@ export default function StatsScreen() {
 
         <View className="flex-row items-center gap-8 mb-4">
           {SAVINGS_ICONS.map(({ Icon: IconComp, progress }, idx) => (
-            <CircularProgressItem key={idx} Icon={IconComp} progress={progress} />
+            <CircularProgressItem
+              key={idx}
+              Icon={IconComp}
+              progress={progress}
+            />
           ))}
-          <View className="h-12 pl-4 bg-secondary-800 items-center justify-center">
+          <View className="h-12 bg-secondary-800 items-center justify-center">
             <Text className="text-[20px] font-montserrat-medium text-light-900">
               +2
             </Text>
@@ -212,15 +208,17 @@ export default function StatsScreen() {
           $23,789
         </Text>
 
-        <View className="bg-secondary-900 px-4 py-3 rounded-full mb-6 self-start">
-          <Text className="text-[12px] font-montserrat-medium text-light-900">
-            2 BUDGETS APPROACHING LIMIT
-          </Text>
+        <View className="mb-6">
+          <AlertBadge text="2 BUDGETS APPROACHING LIMIT" />
         </View>
 
         <View className="flex-row items-center gap-8 mb-4">
           {BUDGET_ICONS.map(({ Icon: IconComp, progress }, idx) => (
-            <CircularProgressItem key={idx} Icon={IconComp} progress={progress} />
+            <CircularProgressItem
+              key={idx}
+              Icon={IconComp}
+              progress={progress}
+            />
           ))}
         </View>
       </StatSection>

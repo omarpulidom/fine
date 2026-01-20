@@ -1,5 +1,5 @@
 import { View, Text } from "react-native";
-import { ManageButton } from "@/components/UI/Common";
+import { ManageButton } from "@/components/ui/Common";
 
 interface StatSectionProps {
   title: string;

@@ -5,8 +5,8 @@ import {
   SectionHeader,
   ActionButton,
   IconButton,
-} from "@/components/UI/Common";
-import { OverviewCard, TransactionDayGroup } from "@/components/UI/Blocks";
+} from "@/components/ui/Common";
+import { OverviewCard, TransactionDayGroup } from "@/components/ui/Blocks";
 import type { TransactionGroup, ProgressSegment } from "@/types/finance.types";
 
 // Mock data

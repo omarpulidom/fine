@@ -1,10 +1,10 @@
-import { View, Text, ScrollView } from "react-native";
-import { SectionHeader } from "@/components/UI/Common";
+import { View, ScrollView } from "react-native";
+import { SectionHeader, ScreenTitle } from "@/components/ui/Common";
 import {
   SummaryCard,
   ItemCard,
   HorizontalCardList,
-} from "@/components/UI/Blocks";
+} from "@/components/ui/Blocks";
 import type { FinanceItem, ProgressSegment } from "@/types/finance.types";
 
 // Mock data
@@ -80,9 +80,7 @@ export default function SavingsScreen() {
   return (
     <ScrollView className="flex-1 px-7 pt-4 bg-secondary-800">
       {/* Title */}
-      <Text className="text-[20px] font-montserrat-medium text-primary-600">
-        Savings <Text className="text-light-900">&</Text> Budgets
-      </Text>
+      <ScreenTitle title="Savings" highlight="Budgets" />
 
       {/* Main cards */}
       <View className="flex-row gap-4 mt-8">
