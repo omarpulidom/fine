@@ -13,7 +13,7 @@ const getTabLabel = (routeName: string) => {
     case "index":
       return "Wallet";
     case "stats":
-      return "Statics";
+      return "Stats";
     case "savings":
       return "Savings";
     case "debts":
@@ -96,7 +96,7 @@ export function TabBar({ state, navigation }: BottomTabBarProps) {
                   {isFocused && (
                     <Text
                       className={
-                        "font-montserrat-medium text-[14px] w-16 text-secondary-800"
+                        "font-montserrat-medium text-[14px] text-center w-16 text-secondary-800"
                       }
                     >
                       {getTabLabel(route.name)}

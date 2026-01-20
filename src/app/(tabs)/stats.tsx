@@ -272,163 +272,157 @@ export default function StatsScreen() {
       </View>
 
       {/* Debts & Loans */}
-      <View className="flex-row gap-4 mb-3">
-        {/* Debts */}
-        <View className="flex-1 border border-secondary-700 rounded-3xl pt-7 px-4 pb-4">
-          {/* Header */}
-          <View className="flex-row justify-between items-center mb-6">
-            <View className="gap-1">
-              <Text className="text-[18px] font-montserrat-medium text-light-800">
-                Debts
-              </Text>
-              <Text className="text-[14px] font-montserrat-regular text-secondary-500">
-                Total payed
-              </Text>
+      <View className="gap-3">
+        <View className="flex-row gap-4">
+          {/* Debts */}
+          <View className="flex-1 border border-secondary-700 rounded-3xl pt-7 px-4 pb-4">
+            {/* Header */}
+            <View className="flex-row justify-between items-center mb-6">
+              <View className="gap-1">
+                <Text className="text-[18px] font-montserrat-medium text-light-800">
+                  Debts
+                </Text>
+                <Text className="text-[14px] font-montserrat-regular text-secondary-500">
+                  Total payed
+                </Text>
+              </View>
+              <View className="p-3 bg-secondary-900 rounded-full">
+                <Text className="text-[12px] font-montserrat-medium text-light-900">
+                  65%
+                </Text>
+              </View>
             </View>
-            <View className="p-3 bg-secondary-900 rounded-full">
-              <Text className="text-[12px] font-montserrat-medium text-light-900">
-                65%
-              </Text>
+            {/* Progress circle placeholder */}
+            <View className="w-16 h-16 self-center items-center justify-center relative mb-8">
+              <Svg
+                width={64}
+                height={64}
+                style={{ position: "absolute", top: 0, left: 0 }}
+              >
+                {/* Background circle */}
+                <Circle
+                  cx={32}
+                  cy={32}
+                  r={29}
+                  stroke={Colors.secondary[900]}
+                  strokeWidth={6}
+                  fill="none"
+                />
+                {/* Progress circle */}
+                <Circle
+                  cx={32}
+                  cy={32}
+                  r={29}
+                  stroke={Colors.primary[700]}
+                  strokeWidth={6}
+                  fill="none"
+                  strokeDasharray={2 * Math.PI * 29}
+                  strokeDashoffset={2 * Math.PI * 29 * (1 - 0.65)}
+                  strokeLinecap="round"
+                  rotation="-90"
+                  origin="32, 32"
+                />
+              </Svg>
+              <Icon.ArrowDownIcon
+                size={18}
+                color={Colors.light[800]}
+                style={{ marginTop: 8, marginLeft: 8 }}
+              />
+            </View>
+            {/* Footer */}
+            <View className="flex-row self-center items-center gap-1">
+              <Icon.TrendDownIcon size={18} color={Colors.primary[600]} />
+              <View className="items-center">
+                <Text className="text-[12px] font-montserrat-medium text-light-900">
+                  12% vs last month
+                </Text>
+                <Text className="text-[12px] font-montserrat-medium text-primary-600">
+                  in debt amount
+                </Text>
+              </View>
             </View>
           </View>
+          {/* Loans */}
+          <View className="flex-1 border border-secondary-700 rounded-3xl pt-7 px-4 pb-4">
+            {/* Header */}
+            <View className="flex-row justify-between items-center mb-6">
+              <View className="gap-1">
+                <Text className="text-[18px] font-montserrat-medium text-light-800">
+                  Loans
+                </Text>
+                <Text className="text-[14px] font-montserrat-regular text-secondary-500">
+                  Total payed
+                </Text>
+              </View>
+              <View className="p-3 bg-secondary-900 rounded-full">
+                <Text className="text-[12px] font-montserrat-medium text-light-900">
+                  80%
+                </Text>
+              </View>
+            </View>
 
-          {/* Progress circle placeholder */}
-          <View className="w-16 h-16 self-center items-center justify-center relative mb-8">
-            <Svg
-              width={64}
-              height={64}
-              style={{ position: "absolute", top: 0, left: 0 }}
-            >
-              {/* Background circle */}
-              <Circle
-                cx={32}
-                cy={32}
-                r={29}
-                stroke={Colors.secondary[900]}
-                strokeWidth={6}
-                fill="none"
+            {/* Progress circle placeholder */}
+            <View className="w-16 h-16 self-center items-center justify-center relative mb-8">
+              <Svg
+                width={64}
+                height={64}
+                style={{ position: "absolute", top: 0, left: 0 }}
+              >
+                {/* Background circle */}
+                <Circle
+                  cx={32}
+                  cy={32}
+                  r={29}
+                  stroke={Colors.secondary[900]}
+                  strokeWidth={6}
+                  fill="none"
+                />
+                {/* Progress circle */}
+                <Circle
+                  cx={32}
+                  cy={32}
+                  r={29}
+                  stroke={Colors.primary[700]}
+                  strokeWidth={6}
+                  fill="none"
+                  strokeDasharray={2 * Math.PI * 29}
+                  strokeDashoffset={2 * Math.PI * 29 * (1 - 0.8)}
+                  strokeLinecap="round"
+                  rotation="-90"
+                  origin="32, 32"
+                />
+              </Svg>
+              <Icon.ArrowUpIcon
+                size={18}
+                color={Colors.light[800]}
+                style={{ marginTop: 8, marginLeft: 8 }}
               />
+            </View>
 
-              {/* Progress circle */}
-              <Circle
-                cx={32}
-                cy={32}
-                r={29}
-                stroke={Colors.primary[700]}
-                strokeWidth={6}
-                fill="none"
-                strokeDasharray={2 * Math.PI * 29}
-                strokeDashoffset={2 * Math.PI * 29 * (1 - 0.65)}
-                strokeLinecap="round"
-                rotation="-90"
-                origin="32, 32"
-              />
-            </Svg>
-
-            <Icon.ArrowDownIcon
-              size={18}
-              color={Colors.light[800]}
-              style={{ marginTop: 8, marginLeft: 8 }}
-            />
-          </View>
-
-          {/* Footer */}
-          <View className="flex-row self-center items-center gap-1">
-            <Icon.TrendDownIcon size={18} color={Colors.primary[600]} />
-            <View className="items-center">
-              <Text className="text-[12px] font-montserrat-medium text-light-900">
-                12% vs last month
-              </Text>
-              <Text className="text-[12px] font-montserrat-medium text-primary-600">
-                in debt amount
-              </Text>
+            {/* Footer */}
+            <View className="flex-row self-center items-center gap-1">
+              <Icon.TrendUpIcon size={18} color={Colors.primary[600]} />
+              <View className="items-center">
+                <Text className="text-[12px] font-montserrat-medium text-light-900">
+                  8% vs last month
+                </Text>
+                <Text className="text-[12px] font-montserrat-medium text-primary-600">
+                  in loan amount
+                </Text>
+              </View>
             </View>
           </View>
         </View>
-
-        {/* Loans */}
-        <View className="flex-1 border border-secondary-700 rounded-3xl pt-7 px-4 pb-4">
-          {/* Header */}
-          <View className="flex-row justify-between items-center mb-6">
-            <View className="gap-1">
-              <Text className="text-[18px] font-montserrat-medium text-light-800">
-                Loans
-              </Text>
-              <Text className="text-[14px] font-montserrat-regular text-secondary-500">
-                Total payed
-              </Text>
-            </View>
-            <View className="p-3 bg-secondary-900 rounded-full">
-              <Text className="text-[12px] font-montserrat-medium text-light-900">
-                80%
-              </Text>
-            </View>
+        {/* Manage button */}
+        <TouchableOpacity className="flex-row items-center justify-end gap-3 pr-4">
+          <Text className="text-[14px] font-montserrat-regular text-light-900">
+            Manage debts & loans
+          </Text>
+          <View className="w-12 h-12 border border-secondary-700 rounded-full items-center justify-center">
+            <Icon.ArrowRightIcon size={16} color={Colors.light[900]} />
           </View>
-
-          {/* Progress circle placeholder */}
-          <View className="w-16 h-16 self-center items-center justify-center relative mb-8">
-            <Svg
-              width={64}
-              height={64}
-              style={{ position: "absolute", top: 0, left: 0 }}
-            >
-              {/* Background circle */}
-              <Circle
-                cx={32}
-                cy={32}
-                r={29}
-                stroke={Colors.secondary[900]}
-                strokeWidth={6}
-                fill="none"
-              />
-
-              {/* Progress circle */}
-              <Circle
-                cx={32}
-                cy={32}
-                r={29}
-                stroke={Colors.primary[700]}
-                strokeWidth={6}
-                fill="none"
-                strokeDasharray={2 * Math.PI * 29}
-                strokeDashoffset={2 * Math.PI * 29 * (1 - 0.8)}
-                strokeLinecap="round"
-                rotation="-90"
-                origin="32, 32"
-              />
-            </Svg>
-
-            <Icon.ArrowUpIcon
-              size={18}
-              color={Colors.light[800]}
-              style={{ marginTop: 8, marginLeft: 8 }}
-            />
-          </View>
-
-          {/* Footer */}
-          <View className="flex-row self-center items-center gap-1">
-            <Icon.TrendUpIcon size={18} color={Colors.primary[600]} />
-            <View className="items-center">
-              <Text className="text-[12px] font-montserrat-medium text-light-900">
-                8% vs last month
-              </Text>
-              <Text className="text-[12px] font-montserrat-medium text-primary-600">
-                in loan amount
-              </Text>
-            </View>
-          </View>
-        </View>
+        </TouchableOpacity>
       </View>
-
-      {/* Manage button */}
-      <TouchableOpacity className="flex-row items-center justify-end gap-3">
-        <Text className="text-[14px] font-montserrat-regular text-light-900">
-          Manage debts & loans
-        </Text>
-        <View className="w-12 h-12 border border-secondary-700 rounded-full items-center justify-center">
-          <Icon.ArrowRightIcon size={16} color={Colors.light[900]} />
-        </View>
-      </TouchableOpacity>
 
       {/* Budgets status */}
       <View className="border border-secondary-700 rounded-3xl pt-7 px-4 pb-4 my-6">
