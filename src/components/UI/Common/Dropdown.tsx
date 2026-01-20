@@ -1,5 +1,5 @@
 import { Colors } from "@/components/colors";
-import { CaretUpIcon, CaretDownIcon, CheckIcon } from "phosphor-react-native";
+import { CaretUpIcon, CaretDownIcon } from "phosphor-react-native";
 import { useState, useRef, useEffect } from "react";
 import {
   Text,
@@ -157,4 +157,4 @@ function Dropdown({
   );
 }
 
-export default Dropdown;
+export { Dropdown };

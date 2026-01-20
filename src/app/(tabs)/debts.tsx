@@ -1,7 +1,81 @@
-import { View, Text, ScrollView, TouchableOpacity } from "react-native";
+import { View, Text, ScrollView } from "react-native";
+import { SectionHeader } from "@/components/UI/Common";
+import {
+  SummaryCard,
+  ItemCard,
+  HorizontalCardList,
+} from "@/components/UI/Blocks";
+import type { FinanceItem, ProgressSegment } from "@/types/finance.types";
 
-import * as Icon from "phosphor-react-native";
-import { Colors } from "@/components/colors";
+// Mock data
+const DEBT_SEGMENTS: ProgressSegment[] = [
+  { color: "#a855f7", flex: 45 },
+  { color: "#0ab87e", flex: 25 },
+  { color: "#facc15", flex: 15 },
+  { color: "#ef4444", flex: 15 },
+];
+
+const LOAN_SEGMENTS: ProgressSegment[] = [
+  { color: "#a855f7", flex: 40 },
+  { color: "#0ab87e", flex: 30 },
+  { color: "#facc15", flex: 15 },
+  { color: "#ef4444", flex: 15 },
+];
+
+const DEBTS_DATA: FinanceItem[] = [
+  {
+    id: "1",
+    title: "Carro",
+    current: 4112,
+    total: 5000,
+    percentage: 76,
+    tagColor: "#7e22ce",
+    dueDate: "10 JAN",
+  },
+  {
+    id: "2",
+    title: "Comida",
+    current: 647,
+    total: 1000,
+    percentage: 65,
+    tagColor: "#16a34a",
+  },
+  {
+    id: "3",
+    title: "Moto",
+    current: 45112,
+    total: 89000,
+    percentage: 54,
+    tagColor: "#be185d",
+  },
+];
+
+const LOANS_DATA: FinanceItem[] = [
+  {
+    id: "1",
+    title: "Carro",
+    current: 3450,
+    total: 5000,
+    percentage: 69,
+    tagColor: "#7e22ce",
+  },
+  {
+    id: "2",
+    title: "Comida",
+    current: 2890,
+    total: 4000,
+    percentage: 72,
+    tagColor: "#16a34a",
+  },
+  {
+    id: "3",
+    title: "Transporte",
+    current: 1234,
+    total: 2000,
+    percentage: 62,
+    tagColor: "#be185d",
+  },
+];
 
 export default function DebtsScreen() {
   return (
@@ -13,392 +87,69 @@ export default function DebtsScreen() {
 
       {/* Main cards */}
       <View className="flex-row gap-4 mt-8">
-        {/* Debts Card */}
-        <TouchableOpacity className="bg-secondary-900 flex-1 rounded-3xl p-5 pt-8 gap-2">
-          {/* Title */}
-          <Text className="font-montserrat-medium text-[32px] w-32 text-light-900 leading-[32px]">
-            You owe
-          </Text>
-          {/* Amounts */}
-          <View className="flex-col gap-2 my-2">
-            <View className="flex-row justify-between items-center">
-              <Text className="font-montserrat-semibold text-[24px] text-light-800">
-                $11,453
-              </Text>
-              <Text className="font-montserrat-medium text-[16px] text-secondary-500">
-                of
-              </Text>
-            </View>
-            <Text className="font-montserrat-medium text-[16px] text-secondary-500">
-              $18,000 debt
-            </Text>
-          </View>
-          {/* Percentage */}
-          <View className="flex-row items-center gap-2">
-            <View className="bg-secondary-500 rounded-full py-2 px-4 self-start">
-              <Text className="font-montserrat-semibold text-[12px] text-light-900">
-                46%
-              </Text>
-            </View>
-            <Text className="font-montserrat-medium text-[14px] text-secondary-500">
-              payed
-            </Text>
-          </View>
-          {/* Percentage */}
-          <View>
-            <View className="bg-secondary-500 h-4 mt-2 rounded-full overflow-hidden flex-row">
-              <View className="bg-purple-500 flex-[45] rounded-full z-40" />
-              <View className="bg-greeny-300 flex-[25] rounded-full -ml-3 z-30" />
-              <View className="bg-yellow-400 flex-[15] rounded-full -ml-3 z-20" />
-              <View className="bg-red-500 flex-[15] rounded-full -ml-3 z-10" />
-            </View>
-          </View>
-        </TouchableOpacity>
-
-        {/* Loan Card */}
-        <TouchableOpacity className="bg-primary-700 flex-1 rounded-3xl p-5 pt-8 gap-2">
-          {/* Title */}
-          <Text className="font-montserrat-medium text-[32px] w-32 text-light-900 leading-[32px]">
-            Owed to you
-          </Text>
-          {/* Amounts */}
-          <View className="flex-col gap-2 my-2">
-            <View className="flex-row justify-between items-center">
-              <Text className="font-montserrat-semibold text-[24px] text-light-800">
-                $9,731
-              </Text>
-              <Text className="font-montserrat-medium text-[16px] text-primary-600">
-                of
-              </Text>
-            </View>
-            <Text className="font-montserrat-medium text-[16px] text-primary-600">
-              $23,000 loans
-            </Text>
-          </View>
-          {/* Percentage */}
-          <View className="flex-row items-center gap-2">
-            <View className="bg-primary-600 rounded-full py-2 px-4 self-start">
-              <Text className="font-montserrat-semibold text-[12px] text-light-900">
-                62%
-              </Text>
-            </View>
-            <Text className="font-montserrat-medium text-[14px] text-primary-600">
-              payed
-            </Text>
-          </View>
-          {/* Percentage */}
-          <View>
-            <View className="bg-secondary-500 h-4 mt-2 rounded-full overflow-hidden flex-row">
-              <View className="bg-purple-500 flex-[40] rounded-full z-40" />
-              <View className="bg-greeny-300 flex-[30] rounded-full -ml-3 z-30" />
-              <View className="bg-yellow-400 flex-[15] rounded-full -ml-3 z-20" />
-              <View className="bg-red-500 flex-[15] rounded-full -ml-3 z-10" />
-            </View>
-          </View>
-        </TouchableOpacity>
+        <SummaryCard
+          title="You owe"
+          current={11453}
+          total={18000}
+          percentage={46}
+          totalLabel="debt"
+          statusLabel="payed"
+          variant="secondary"
+          segments={DEBT_SEGMENTS}
+        />
+        <SummaryCard
+          title="Owed to you"
+          current={9731}
+          total={23000}
+          percentage={62}
+          totalLabel="loans"
+          statusLabel="payed"
+          variant="primary"
+          segments={LOAN_SEGMENTS}
+        />
       </View>
 
-      {/* MyDebts */}
+      {/* My Debts */}
       <View className="mt-8 gap-6">
-        {/* Subtitle */}
-        <View className="items-center justify-between flex-row">
-          <Text className="text-light-800 font-montserrat-medium text-[20px]">
-            My <Text className="text-primary-600">Debts</Text>
-          </Text>
-          <TouchableOpacity>
-            <Text className="text-secondary-500 font-montserrat-medium text-[14px]">
-              See All
-            </Text>
-          </TouchableOpacity>
-        </View>
+        <SectionHeader title="My" highlight="Debts" showSeeAll />
 
-        {/* Debts items */}
-        {/* TODO: Cambiar ScrollView a FlatList */}
-        <View className="flex-row gap-4 -mr-7">
-          {/* Add button */}
-          <TouchableOpacity className="rounded-full border-2 border-secondary-700 border-dashed w-16 items-center justify-center">
-            <Icon.PlusIcon size={20} color={Colors.secondary[500]} />
-          </TouchableOpacity>
-
-          {/* Debt Cards List */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerClassName="gap-4 pr-7"
-          >
-            {/* Debt Card */}
-            <TouchableOpacity className="bg-secondary-900 rounded-3xl p-5 gap-2">
-              {/* Tags */}
-              <View className="items-center justify-between flex-row h-8">
-                <View className="bg-purple-700 rounded-full w-3 h-3" />
-                <View className="bg-secondary-500 rounded-full py-2 px-4">
-                  <Text className="font-montserrat-bold text-[12px] text-light-900">
-                    10 JAN
-                  </Text>
-                </View>
-              </View>
-              {/* Title */}
-              <Text
-                className="font-montserrat-medium text-[20px] w-36 text-light-900 leading-[32px]"
-                numberOfLines={1}
-              >
-                Carro
-              </Text>
-              {/* Amounts */}
-              <View className="flex-col gap-1 my-2">
-                <View className="flex-row justify-between items-center">
-                  <Text className="font-montserrat-medium text-[24px] text-light-800">
-                    $4,112
-                  </Text>
-                  <Text className="font-montserrat-medium text-[16px] text-secondary-500">
-                    of
-                  </Text>
-                </View>
-                <Text className="font-montserrat-medium text-[16px] text-secondary-500">
-                  $5,000
-                </Text>
-              </View>
-              {/* Percentage */}
-              <View className="flex-row items-center gap-2">
-                <View className="bg-secondary-500 rounded-full py-2 px-4 self-start">
-                  <Text className="font-montserrat-semibold text-[12px] text-light-900">
-                    76%
-                  </Text>
-                </View>
-                <Text className="font-montserrat-medium text-[14px] text-secondary-500">
-                  payed
-                </Text>
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity className="bg-secondary-900 rounded-3xl p-5 gap-2">
-              {/* Tag */}
-              <View className="h-8 items-center flex-row justify-between">
-                <View className="bg-green-600 rounded-full w-3 h-3" />
-              </View>
-              {/* Title */}
-              <Text
-                className="font-montserrat-medium text-[20px] w-36 text-light-900 leading-[32px]"
-                numberOfLines={1}
-              >
-                Comida
-              </Text>
-              {/* Amounts */}
-              <View className="flex-col gap-1 my-2">
-                <View className="flex-row justify-between items-center">
-                  <Text className="font-montserrat-medium text-[24px] text-light-800">
-                    $647
-                  </Text>
-                  <Text className="font-montserrat-medium text-[16px] text-secondary-500">
-                    of
-                  </Text>
-                </View>
-                <Text className="font-montserrat-medium text-[16px] text-secondary-500">
-                  $1,000
-                </Text>
-              </View>
-              {/* Percentage */}
-              <View className="flex-row items-center gap-2">
-                <View className="bg-secondary-500 rounded-full py-2 px-4 self-start">
-                  <Text className="font-montserrat-semibold text-[12px] text-light-900">
-                    65%
-                  </Text>
-                </View>
-                <Text className="font-montserrat-medium text-[14px] text-secondary-500">
-                  payed
-                </Text>
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity className="bg-secondary-900 rounded-3xl p-5 gap-2">
-              {/* Tag */}
-              <View className="h-8 items-center flex-row justify-between">
-                <View className="bg-pink-700 rounded-full w-3 h-3" />
-              </View>
-              {/* Title */}
-              <Text
-                className="font-montserrat-medium text-[20px] w-36 text-light-900 leading-[32px]"
-                numberOfLines={1}
-              >
-                Moto
-              </Text>
-              {/* Amounts */}
-              <View className="flex-col gap-1 my-2">
-                <View className="flex-row justify-between items-center">
-                  <Text className="font-montserrat-medium text-[24px] text-light-800">
-                    $45,112
-                  </Text>
-                  <Text className="font-montserrat-medium text-[16px] text-secondary-500">
-                    of
-                  </Text>
-                </View>
-                <Text className="font-montserrat-medium text-[16px] text-secondary-500">
-                  $89,000
-                </Text>
-              </View>
-              {/* Percentage */}
-              <View className="flex-row items-center gap-2">
-                <View className="bg-secondary-500 rounded-full py-2 px-4 self-start">
-                  <Text className="font-montserrat-semibold text-[12px] text-light-900">
-                    54%
-                  </Text>
-                </View>
-                <Text className="font-montserrat-medium text-[14px] text-secondary-500">
-                  payed
-                </Text>
-              </View>
-            </TouchableOpacity>
-          </ScrollView>
-        </View>
+        <HorizontalCardList
+          data={DEBTS_DATA}
+          keyExtractor={(item) => item.id}
+          renderItem={(item) => (
+            <ItemCard
+              title={item.title}
+              current={item.current}
+              total={item.total}
+              percentage={item.percentage}
+              tagColor={item.tagColor}
+              dueDate={item.dueDate}
+              variant="secondary"
+              statusLabel="payed"
+            />
+          )}
+        />
       </View>
 
-      {/* MyLoans */}
+      {/* My Loans */}
       <View className="mt-8 gap-6">
-        {/* Subtitle */}
-        <View className="items-center justify-between flex-row">
-          <Text className="text-light-800 font-montserrat-medium text-[20px]">
-            My <Text className="text-primary-600">Loans</Text>
-          </Text>
-          <TouchableOpacity>
-            <Text className="text-secondary-500 font-montserrat-medium text-[14px]">
-              See All
-            </Text>
-          </TouchableOpacity>
-        </View>
+        <SectionHeader title="My" highlight="Loans" showSeeAll />
 
-        {/* Loan items */}
-        {/* TODO: Cambiar ScrollView a FlatList */}
-        <View className="flex-row gap-4 -mr-7">
-          {/* Add button */}
-          <TouchableOpacity className="rounded-full border-2 border-secondary-700 border-dashed w-16 items-center justify-center">
-            <Icon.PlusIcon size={20} color={Colors.secondary[500]} />
-          </TouchableOpacity>
-
-          {/* Loan Cards List */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerClassName="gap-4 pr-7"
-          >
-            {/* Loan Card */}
-            <TouchableOpacity className="bg-primary-700 rounded-3xl p-5 gap-2">
-              {/* Tag */}
-              <View className="h-8 items-center flex-row justify-between">
-                <View className="bg-purple-700 rounded-full w-3 h-3" />
-              </View>
-              {/* Title */}
-              <Text
-                className="font-montserrat-medium text-[20px] w-36 text-light-900 leading-[32px]"
-                numberOfLines={1}
-              >
-                Carro
-              </Text>
-              {/* Amounts */}
-              <View className="flex-col gap-1 my-2">
-                <View className="flex-row justify-between items-center">
-                  <Text className="font-montserrat-medium text-[24px] text-light-800">
-                    $3,450
-                  </Text>
-                  <Text className="font-montserrat-medium text-[16px] text-primary-600">
-                    of
-                  </Text>
-                </View>
-                <Text className="font-montserrat-medium text-[16px] text-primary-600">
-                  $5,000
-                </Text>
-              </View>
-              {/* Percentage */}
-              <View className="flex-row items-center gap-2">
-                <View className="bg-primary-600 rounded-full py-2 px-4 self-start">
-                  <Text className="font-montserrat-semibold text-[12px] text-light-900">
-                    69%
-                  </Text>
-                </View>
-                <Text className="font-montserrat-medium text-[14px] text-primary-600">
-                  payed
-                </Text>
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity className="bg-primary-700 rounded-3xl p-5 gap-2">
-              {/* Tag */}
-              <View className="h-8 items-center flex-row justify-between">
-                <View className="bg-green-600 rounded-full w-3 h-3" />
-              </View>
-              {/* Title */}
-              <Text
-                className="font-montserrat-medium text-[20px] w-36 text-light-900 leading-[32px]"
-                numberOfLines={1}
-              >
-                Comida
-              </Text>
-              {/* Amounts */}
-              <View className="flex-col gap-1 my-2">
-                <View className="flex-row justify-between items-center">
-                  <Text className="font-montserrat-medium text-[24px] text-light-800">
-                    $2,890
-                  </Text>
-                  <Text className="font-montserrat-medium text-[16px] text-primary-600">
-                    of
-                  </Text>
-                </View>
-                <Text className="font-montserrat-medium text-[16px] text-primary-600">
-                  $4,000
-                </Text>
-              </View>
-              {/* Percentage */}
-              <View className="flex-row items-center gap-2">
-                <View className="bg-primary-600 rounded-full py-2 px-4 self-start">
-                  <Text className="font-montserrat-semibold text-[12px] text-light-900">
-                    72%
-                  </Text>
-                </View>
-                <Text className="font-montserrat-medium text-[14px] text-primary-600">
-                  payed
-                </Text>
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity className="bg-primary-700 rounded-3xl p-5 gap-2">
-              {/* Tag */}
-              <View className="h-8 items-center flex-row justify-between">
-                <View className="bg-pink-700 rounded-full w-3 h-3" />
-              </View>
-              {/* Title */}
-              <Text
-                className="font-montserrat-medium text-[20px] w-36 text-light-900 leading-[32px]"
-                numberOfLines={1}
-              >
-                Transporte
-              </Text>
-              {/* Amounts */}
-              <View className="flex-col gap-1 my-2">
-                <View className="flex-row justify-between items-center">
-                  <Text className="font-montserrat-medium text-[24px] text-light-800">
-                    $1,234
-                  </Text>
-                  <Text className="font-montserrat-medium text-[16px] text-primary-600">
-                    of
-                  </Text>
-                </View>
-                <Text className="font-montserrat-medium text-[16px] text-primary-600">
-                  $2,000
-                </Text>
-              </View>
-              {/* Percentage */}
-              <View className="flex-row items-center gap-2">
-                <View className="bg-primary-600 rounded-full py-2 px-4 self-start">
-                  <Text className="font-montserrat-semibold text-[12px] text-light-900">
-                    62%
-                  </Text>
-                </View>
-                <Text className="font-montserrat-medium text-[14px] text-primary-600">
-                  payed
-                </Text>
-              </View>
-            </TouchableOpacity>
-          </ScrollView>
-        </View>
+        <HorizontalCardList
+          data={LOANS_DATA}
+          keyExtractor={(item) => item.id}
+          renderItem={(item) => (
+            <ItemCard
+              title={item.title}
+              current={item.current}
+              total={item.total}
+              percentage={item.percentage}
+              tagColor={item.tagColor}
+              variant="primary"
+              statusLabel="payed"
+            />
+          )}
+        />
       </View>
 
       <View className="h-36" />

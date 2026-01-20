@@ -1,6 +1,6 @@
 import { Redirect, Tabs } from "expo-router";
-import { TabBar } from "@/components/Elements/TabBar";
-import { Header } from "@/components/Elements/Header";
+import { TabBar } from "@/components/UI/Common";
+import { Header } from "@/components/UI/Common";
 import { useAuth } from "@/components/Providers/AuthProvider";
 
 export default function TabsLayout() {
