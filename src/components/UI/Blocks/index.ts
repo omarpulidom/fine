@@ -9,3 +9,4 @@ export { StatSection } from "./StatSection";
 export { AverageCard } from "./AverageCard";
 export { CircularProgressItem } from "./CircularProgressItem";
 export { MiniStatCard } from "./MiniStatCard";
+export { PaymentCalendar } from "./PaymentCalendar";

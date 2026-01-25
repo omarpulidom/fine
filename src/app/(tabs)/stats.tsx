@@ -6,13 +6,12 @@ import {
   ScreenTitle,
   ChipSelector,
   AlertBadge,
-} from "@/components/ui/Common";
-import {
   StatSection,
   AverageCard,
   CircularProgressItem,
   MiniStatCard,
-} from "@/components/ui/Blocks";
+  PaymentCalendar,
+} from "@/components/ui";
 import { useState } from "react";
 import type { IconComponent } from "@/types/finance.types";
 
@@ -24,7 +23,6 @@ const RANGE_OPTIONS = [
 ];
 
 const MONTHS = ["JAN", "FEB", "MAR", "APR", "JUN", "JUL"];
-const DAYS = ["S", "M", "T", "W", "T", "F", "S"];
 
 interface ProgressIcon {
   Icon: IconComponent;
@@ -120,27 +118,15 @@ export default function StatsScreen() {
       <StatSection
         title="Payment calendar"
         subtitle="Never miss a payment"
-        badgeText="SEPTEMBER"
+        badgeText="JANUARY"
         manageLabel="Manage payments"
       >
-        {/* Calendar Grid */}
-        <View className="mb-4">
-          <View className="flex-row justify-around mb-4">
-            {DAYS.map((day, idx) => (
-              <Text
-                key={idx}
-                className="text-[12px] font-montserrat-medium text-secondary-500 w-8 text-center"
-              >
-                {day}
-              </Text>
-            ))}
-          </View>
-          <View className="h-48 bg-secondary-800 rounded-2xl items-center justify-center">
-            <Text className="text-secondary-500 text-[12px]">
-              Calendar Grid
-            </Text>
-          </View>
-        </View>
+        <PaymentCalendar
+          paymentDays={[6, 25, 19]}
+          onPaymentPress={(day) => {
+            console.log(`Payment on day ${day}`);
+          }}
+        />
       </StatSection>
 
       {/* Your savings */}
@@ -171,7 +157,7 @@ export default function StatsScreen() {
       </StatSection>
 
       {/* Debts & Loans */}
-      <View className="gap-3">
+      <View className="gap-3 mb-6">
         <View className="flex-row gap-4">
           <MiniStatCard
             title="Debts"
