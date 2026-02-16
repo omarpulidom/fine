@@ -4,6 +4,7 @@ import {
   SummaryCard,
   ItemCard,
   HorizontalCardList,
+  InfoStatsBar,
 } from "@/components/ui/Blocks";
 import type { FinanceItem, ProgressSegment } from "@/types/finance.types";
 
@@ -111,6 +112,14 @@ export default function DebtsScreen() {
       <View className="mt-8 gap-6">
         <SectionHeader title="My" highlight="Debts" showSeeAll />
 
+        <InfoStatsBar
+          stats={[
+            { label: "Active debts", value: "3" },
+            { label: "Next payment", value: "in 2 days", highlighted: true },
+            { label: "Total payed", value: "$2,783" },
+          ]}
+        />
+
         <HorizontalCardList
           data={DEBTS_DATA}
           keyExtractor={(item) => item.id}
@@ -132,6 +141,14 @@ export default function DebtsScreen() {
       {/* My Loans */}
       <View className="mt-8 gap-6">
         <SectionHeader title="My" highlight="Loans" showSeeAll />
+
+        <InfoStatsBar
+          stats={[
+            { label: "Active loans", value: "3" },
+            { label: "Next payment", value: "17 FEB", highlighted: true },
+            { label: "Total payed", value: "$1,866" },
+          ]}
+        />
 
         <HorizontalCardList
           data={LOANS_DATA}
