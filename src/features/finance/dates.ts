@@ -5,20 +5,25 @@ export function localDateKey(date: Date): string {
   return `${year}-${month}-${day}`
 }
 
-export function formatDateDisplay(
-  date: Date,
-  includeYear = true,
-  monthStyle: 'long' | 'short' = 'long',
-): string {
-  const parts = new Intl.DateTimeFormat('es-MX', {
-    day: 'numeric',
-    month: monthStyle,
-    year: 'numeric',
-  }).formatToParts(date)
-  const get = (type: 'day' | 'month' | 'year') =>
-    parts.find((part) => part.type === type)?.value ?? ''
-  const month = get('month')
-  return `${get('day')} ${month.charAt(0).toUpperCase()}${month.slice(1)}${includeYear ? ` ${get('year')}` : ''}`
+const MONTH_NAMES = [
+  'Enero',
+  'Febrero',
+  'Marzo',
+  'Abril',
+  'Mayo',
+  'Junio',
+  'Julio',
+  'Agosto',
+  'Septiembre',
+  'Octubre',
+  'Noviembre',
+  'Diciembre',
+] as const
+
+export function formatDateDisplay(date: Date): string {
+  const day = date.getDate()
+  const month = MONTH_NAMES[date.getMonth()]
+  return `${day} ${month} ${date.getFullYear()}`
 }
 
 export function isDateKey(value: string): boolean {

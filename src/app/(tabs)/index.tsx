@@ -49,7 +49,7 @@ const font = {
 } as const;
 
 function formatDay(date: Date): string {
-  return formatDateDisplay(date, false);
+  return formatDateDisplay(date);
 }
 
 export default function HomeTab() {
