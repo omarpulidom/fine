@@ -1,5 +1,6 @@
 import { storageMMKV } from '@/lib/mmkv/stores'
 import { isDateKey, localDateKey } from './dates'
+import { allocateInstallments, type Installment } from './installments'
 
 const LEDGER_KEY = 'finance:ledger:v1'
 const LEGACY_BALANCE_KEY = 'finance:cash-account-balance-cents:v1'
@@ -56,6 +57,7 @@ export type CardActivity = {
   amountCents: number
   effectiveDate: string
   description: string
+  installments?: Installment[]
 }
 
 export type BalanceReconciliation = {
@@ -296,8 +298,17 @@ export function statementAmountCents(ledger: Ledger, cycleId: string): number {
   return (
     cycle.openingStatementCents +
     ledger.cardActivity
-      .filter((item) => item.cycleId === cycleId && item.type === 'purchase')
-      .reduce((total, item) => total + item.amountCents, 0)
+      .filter((item) => item.type === 'purchase')
+      .reduce(
+        (total, item) =>
+          total +
+          (item.installments
+            ? (item.installments.find((part) => part.cycleId === cycleId)?.amountCents ?? 0)
+            : item.cycleId === cycleId
+              ? item.amountCents
+              : 0),
+        0,
+      )
   )
 }
 
@@ -483,6 +494,21 @@ export function addCardActivity(activity: CardActivity, todayKey: string): Ledge
   const targetCycle = cycles.find((item) => item.id === cycle.id)
   if (!targetCard || !targetCycle) throw new Error('No se encontró la tarjeta o el ciclo')
   if (activity.type === 'purchase') {
+    if (activity.installments) {
+      const parts = activity.installments
+      if (
+        parts.length < 2 ||
+        new Set(parts.map((part) => part.cycleId)).size !== parts.length ||
+        parts.reduce((total, part) => total + part.amountCents, 0) !== activity.amountCents ||
+        parts.some(
+          (part) =>
+            part.amountCents <= 0 ||
+            !ledger.cycles.some((item) => item.id === part.cycleId && item.cardId === card.id),
+        )
+      ) {
+        throw new Error('Plan MSI inválido')
+      }
+    }
     targetCard.currentDebtCents += activity.amountCents
   } else {
     const source = accounts.find((item) => item.id === activity.sourceAccountId)
@@ -527,10 +553,24 @@ export function deleteCardActivity(id: string): Ledger {
   const cycle = cycles.find((item) => item.id === activity.cycleId)
   if (!card || !cycle) throw new Error('No se encontró la tarjeta o el ciclo')
   if (activity.type === 'purchase') {
+    const portions = activity.installments ?? [
+      {
+        cycleId: activity.cycleId,
+        amountCents: activity.amountCents,
+      },
+    ]
     if (
-      statementAmountCents(ledger, cycle.id) - activity.amountCents < cycle.paidAmountCents ||
-      statementAmountCents(ledger, cycle.id) - activity.amountCents < cycle.scheduledAmountCents ||
-      card.currentDebtCents < activity.amountCents
+      card.currentDebtCents < activity.amountCents ||
+      portions.some((part) => {
+        const linkedCycle = cycles.find((item) => item.id === part.cycleId)
+        return (
+          !linkedCycle ||
+          statementAmountCents(ledger, part.cycleId) - part.amountCents <
+            linkedCycle.paidAmountCents ||
+          statementAmountCents(ledger, part.cycleId) - part.amountCents <
+            linkedCycle.scheduledAmountCents
+        )
+      })
     )
       throw new Error('No puedes borrar una compra que ya fue pagada')
     card.currentDebtCents -= activity.amountCents
@@ -559,6 +599,7 @@ export function reassignPurchase(id: string, targetCycleId: string): Ledger {
   const origin = ledger.cycles.find((item) => item.id === purchase?.cycleId)
   if (
     !purchase ||
+    purchase.installments ||
     !target ||
     !origin ||
     statementAmountCents(ledger, origin.id) - purchase.amountCents < origin.paidAmountCents ||
@@ -573,6 +614,52 @@ export function reassignPurchase(id: string, targetCycleId: string): Ledger {
         ? {
             ...item,
             cycleId: targetCycleId,
+          }
+        : item,
+    ),
+  })
+}
+
+export function reassignInstallmentPurchase(
+  id: string,
+  firstCycleId: string,
+  months: number,
+): Ledger {
+  const ledger = getLedger()
+  const purchase = ledger.cardActivity.find(
+    (item) => item.id === id && item.type === 'purchase' && item.installments,
+  )
+  if (!purchase?.installments) throw new Error('No se encontró el plan MSI')
+  const nextParts = allocateInstallments(
+    ledger.cycles,
+    purchase.cardId,
+    firstCycleId,
+    months,
+    purchase.amountCents,
+  )
+  const affectedIds = new Set([
+    ...purchase.installments.map((part) => part.cycleId),
+    ...nextParts.map((part) => part.cycleId),
+  ])
+  for (const cycleId of affectedIds) {
+    const cycle = ledger.cycles.find((item) => item.id === cycleId)
+    if (!cycle) throw new Error('Ciclo faltante')
+    const oldShare =
+      purchase.installments.find((part) => part.cycleId === cycleId)?.amountCents ?? 0
+    const newShare = nextParts.find((part) => part.cycleId === cycleId)?.amountCents ?? 0
+    const nextStatement = statementAmountCents(ledger, cycleId) - oldShare + newShare
+    if (nextStatement < cycle.paidAmountCents || nextStatement < cycle.scheduledAmountCents) {
+      throw new Error('Corrige los pagos vinculados antes de cambiar este plan MSI')
+    }
+  }
+  return persist({
+    ...ledger,
+    cardActivity: ledger.cardActivity.map((item) =>
+      item.id === id
+        ? {
+            ...item,
+            cycleId: firstCycleId,
+            installments: nextParts,
           }
         : item,
     ),

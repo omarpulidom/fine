@@ -7,6 +7,7 @@ import { Alert, Pressable, ScrollView, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { AppBottomSheet } from '@/components/ui/AppBottomSheet'
 import { isDateKey, localDateKey } from '@/features/finance/dates'
+import { allocateInstallments } from '@/features/finance/installments'
 import {
   addCardActivity,
   type CardActivity,
@@ -17,6 +18,7 @@ import {
   newCardActivityId,
   newCardId,
   newCycleId,
+  reassignInstallmentPurchase,
   reassignPurchase,
   scheduleCyclePayment,
   statementAmountCents,
@@ -97,6 +99,8 @@ export default function CardsScreen() {
   const [debt, setDebt] = useState('')
   const [billed, setBilled] = useState('')
   const [amount, setAmount] = useState('')
+  const [isInstallment, setIsInstallment] = useState(false)
+  const [installmentMonths, setInstallmentMonths] = useState('3')
   const [activityDate, setActivityDate] = useState(localDateKey(new Date()))
   const [description, setDescription] = useState('')
   const [sourceAccountId, setSourceAccountId] = useState('')
@@ -128,6 +132,8 @@ export default function CardsScreen() {
     setDebt('')
     setBilled('')
     setAmount('')
+    setIsInstallment(Boolean(activity?.installments))
+    setInstallmentMonths(activity?.installments ? String(activity.installments.length) : '3')
     setActivityDate(todayKey)
     setDescription('')
     setScheduledDate(
@@ -252,6 +258,16 @@ export default function CardsScreen() {
               amountCents: cents,
               effectiveDate: activityDate,
               description: description.trim(),
+              installments:
+                mode === 'purchase' && isInstallment
+                  ? allocateInstallments(
+                      ledger.cycles,
+                      selectedCard.id,
+                      selectedCycle.id,
+                      Number(installmentMonths),
+                      cents,
+                    )
+                  : undefined,
             },
             todayKey,
           ),
@@ -284,7 +300,15 @@ export default function CardsScreen() {
         )
       } else if (mode === 'reassign') {
         if (!selectedActivity || !selectedCycleId) throw new Error('Selecciona un ciclo.')
-        setLedger(reassignPurchase(selectedActivity.id, selectedCycleId))
+        setLedger(
+          selectedActivity.installments
+            ? reassignInstallmentPurchase(
+                selectedActivity.id,
+                selectedCycleId,
+                Number(installmentMonths),
+              )
+            : reassignPurchase(selectedActivity.id, selectedCycleId),
+        )
       }
       setMode(null)
     } catch (caught) {
@@ -519,6 +543,16 @@ export default function CardsScreen() {
               {cardCycles.map((cycle) => {
                 const statement = statementAmountCents(ledger, cycle.id)
                 const pending = Math.max(0, cycle.scheduledAmountCents - cycle.paidAmountCents)
+                const installmentShares = activity.flatMap(
+                  (item) =>
+                    item.installments
+                      ?.filter((part) => part.cycleId === cycle.id)
+                      .map((part) => ({
+                        id: item.id,
+                        label: item.description || 'Compra a MSI',
+                        amountCents: part.amountCents,
+                      })) ?? [],
+                )
                 return (
                   <Pressable
                     key={cycle.id}
@@ -551,6 +585,19 @@ export default function CardsScreen() {
                       {cycle.cutoffDate > todayKey ? 'Importe del ciclo' : 'Facturado'}{' '}
                       {formatMoney(statement)} · Pagado {formatMoney(cycle.paidAmountCents)}
                     </Text>
+                    {installmentShares.map((share) => (
+                      <Text
+                        key={share.id}
+                        style={{
+                          fontFamily: regular,
+                          color: MUTED,
+                          fontSize: 12,
+                          marginTop: 4,
+                        }}
+                      >
+                        MSI · {share.label} · {formatMoney(share.amountCents)}
+                      </Text>
+                    ))}
                     {(cycle.paymentToAvoidInterestCents !== undefined ||
                       cycle.minimumPaymentCents !== undefined) && (
                       <Text
@@ -621,7 +668,12 @@ export default function CardsScreen() {
                         marginTop: 3,
                       }}
                     >
-                      {item.effectiveDate} · {item.type === 'purchase' ? 'Cambiar ciclo' : 'Pago'}
+                      {item.effectiveDate} ·{' '}
+                      {item.installments
+                        ? `${item.installments.length} MSI · Cambiar plan`
+                        : item.type === 'purchase'
+                          ? 'Cambiar ciclo'
+                          : 'Pago'}
                     </Text>
                   </Pressable>
                   <Text
@@ -805,6 +857,52 @@ export default function CardsScreen() {
             <>
               <Label>Importe</Label>
               <Field value={amount} onChangeText={setAmount} placeholder='0.00' decimal />
+              {mode === 'purchase' && (
+                <>
+                  <Label>Modalidad</Label>
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      gap: 8,
+                      marginTop: 10,
+                    }}
+                  >
+                    {(
+                      [
+                        [
+                          false,
+                          'Una exhibición',
+                        ],
+                        [
+                          true,
+                          'Meses sin intereses',
+                        ],
+                      ] as const
+                    ).map(([value, label]) => (
+                      <Pressable
+                        key={label}
+                        onPress={() => setIsInstallment(value)}
+                        style={{
+                          paddingVertical: 10,
+                          paddingHorizontal: 12,
+                          borderRadius: 9,
+                          backgroundColor: isInstallment === value ? INK : '#f3f3f3',
+                        }}
+                      >
+                        <Text
+                          style={{
+                            color: isInstallment === value ? '#fff' : INK,
+                            fontFamily: medium,
+                            fontSize: 12,
+                          }}
+                        >
+                          {label}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </>
+              )}
               <Label>Fecha realizada (AAAA-MM-DD)</Label>
               <Field value={activityDate} onChangeText={setActivityDate} placeholder='AAAA-MM-DD' />
               <Label>Concepto (opcional)</Label>
@@ -813,6 +911,27 @@ export default function CardsScreen() {
                 onChangeText={setDescription}
                 placeholder='¿De qué se trata?'
               />
+            </>
+          )}
+          {((mode === 'purchase' && isInstallment) ||
+            (mode === 'reassign' && selectedActivity?.installments)) && (
+            <>
+              <Label>Número de mensualidades (2–36)</Label>
+              <Field
+                value={installmentMonths}
+                onChangeText={setInstallmentMonths}
+                placeholder='3'
+              />
+              <Text
+                style={{
+                  marginTop: 6,
+                  fontFamily: regular,
+                  color: MUTED,
+                  fontSize: 12,
+                }}
+              >
+                Elige arriba el primer ciclo. Deben existir todos los ciclos mensuales consecutivos.
+              </Text>
             </>
           )}
           {mode === 'plan' && (
