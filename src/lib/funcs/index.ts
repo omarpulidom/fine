@@ -1,6 +1,5 @@
 export * from './date'
 export * from './dev'
 export * from './getValues'
-export * from './img'
 export * from './raise'
 export * from './redirects'
