@@ -26,13 +26,16 @@ La app no busca predecir hábitos ni estimar consumos futuros. Es una proyecció
 4. **Tarjetas de crédito**: corte, fecha límite, saldo facturado/deuda actual, compras y pagos.
 5. **Gráfica interactiva de liquidez**: navegar por días y consultar el saldo proyectado de cada fecha; horizontes sugeridos de 7, 30, 60 y 90 días.
 6. **Historial de movimientos** con capacidad de editar o corregir registros.
+7. **Simulación de compra hipotética**: comparar la liquidez base con un escenario temporal sin guardar la compra como movimiento real.
+8. **Compras a meses sin intereses (MSI)**: distribuir una compra de crédito entre ciclos confirmados sin duplicar la deuda ni los pagos.
+9. **Estadísticas sencillas**: ingresos, gastos y diferencia neta de movimientos realizados, por mes y con totales claros.
 
 ### Posibles funciones posteriores, no bloqueantes para el MVP
 
-- Simulación de una compra hipotética («¿y si compro esto?») sin guardarla como movimiento real.
-- Compras a meses sin intereses (MSI), si no se incluyen desde la primera versión.
-- Estadísticas por categorías, presupuestos, metas de ahorro, préstamos y análisis con IA.
+- Presupuestos, metas de ahorro, préstamos y estadísticas avanzadas por categorías.
 - Backend, sincronización bancaria, OCR y autenticación.
+
+**Fuera de alcance:** pronósticos de hábitos y cualquier análisis con IA.
 
 ## 3. Pantalla principal
 
@@ -160,11 +163,13 @@ Se discutieron dos alternativas:
 
 **No dar por decidida A o B todavía.** Diseñar el motor para aceptar pagos programados explícitos; implementar la política predeterminada una vez confirmada. Si se usa A, no confundir saldo facturado con PPNGI en presencia de MSI u otros productos.
 
-### 5.7 MSI — extensión opcional
+### 5.7 MSI — parte del MVP
 
 Una compra de $6,000 a 6 MSI debe registrar deuda de $6,000, pero distribuir en los ciclos correspondientes seis mensualidades de $1,000 (salvo diferencias por redondeo o condiciones de la institución). La liquidez disminuye únicamente en las fechas de pago programadas de los estados de cuenta. No asumir de manera universal cuándo comienza a facturarse la primera mensualidad.
 
-Los MSI son útiles, pero **pueden quedar fuera de la primera entrega** para mantener acotado el MVP.
+Al registrar una compra MSI, pedir **número de mensualidades** y **primer ciclo de facturación**. Generar las mensualidades solo en ciclos que el usuario haya configurado o confirmado; si falta un ciclo, solicitar sus fechas antes de proyectar el pago. La suma exacta de las mensualidades debe coincidir con el precio total, incluyendo el ajuste de centavos por redondeo.
+
+El plan de MSI se vincula a la compra original y a cada ciclo. Una mensualidad incrementa el importe del ciclo correspondiente; **no** vuelve a aumentar la deuda total de la tarjeta. Los pagos programados o realizados de esos ciclos siguen las reglas de la sección 5.4. Permitir corregir el primer ciclo o el número de meses antes de registrar pagos vinculados.
 
 ## 6. Registro rápido de movimientos
 
@@ -181,6 +186,21 @@ Los MSI son útiles, pero **pueden quedar fuera de la primera entrega** para man
 Si se usa tarjeta de crédito, mostrar la tarjeta y el ciclo/pago estimado. El usuario no tiene que ingresar por separado el futuro pago de cada compra; se agrupa por ciclo.
 
 Al crear un movimiento para el futuro, ofrecer **único o recurrente**. Mantener la cantidad de campos obligatorios al mínimo.
+
+### 6.1 Simulación de compra hipotética
+
+- Capturar importe, fecha y medio de pago (efectivo/débito o tarjeta); si es tarjeta, permitir simular pago de contado o MSI.
+- Mostrar **dos curvas comparables**: liquidez actual y liquidez con la compra hipotética, además de la diferencia en la fecha seleccionada.
+- Para efectivo/débito, descontar el importe en la fecha simulada. Para tarjeta, mostrar el aumento de deuda y descontar liquidez únicamente en pagos hipotéticos con fechas e importes explícitos.
+- Si se simulan MSI, usar ciclos y fechas confirmados; no inventar vencimientos ni asumir cuándo empieza la primera mensualidad.
+- Mantener el escenario solo en memoria. Cerrar o descartar la simulación debe restaurar exactamente la proyección base; no crear transacciones, cuotas ni obligaciones reales.
+
+### 6.2 Estadísticas sencillas
+
+- Mostrar, por mes, **ingresos realizados**, **gastos realizados** y **diferencia neta**. Permitir cambiar de mes.
+- Calcular desde movimientos completados y persistidos. Excluir programados, simulaciones, compras de crédito y transferencias internas de los totales de ingresos/gastos líquidos.
+- Mostrar pagos de tarjeta realizados por separado para dar contexto, sin sumar compras y pagos como el mismo gasto dos veces.
+- Usar resúmenes y una visualización simple; no agregar recomendaciones, predicciones ni análisis con IA.
 
 ## 7. Modelo conceptual de datos
 
@@ -245,6 +265,19 @@ Una estructura inicial posible (nombres orientativos):
 - `status`
 - `paidAmount`
 
+### `InstallmentPlan` / `Installment`
+
+- `purchaseTransactionId`, `creditCardAccountId`, `totalAmount`, `installmentCount`, `firstBillingCycleId`.
+- Cada cuota: `billingCycleId`, `amount` y `installmentNumber`; la suma de cuotas equivale exactamente al importe de la compra.
+- Los ciclos contienen la obligación facturada; las cuotas no crean nuevas compras ni vuelven a aumentar la deuda de la tarjeta.
+
+### `SimulationScenario` (solo en memoria)
+
+- Importe, fecha, medio de pago, tarjeta/ciclos si aplica y modalidad de contado o MSI.
+- No persistirlo en tablas ni mezclarlo con movimientos o pagos reales.
+
+Las estadísticas se **derivan** de movimientos realizados; no necesitan otra fuente editable de saldos o totales.
+
 **Requisito técnico importante:** evitar mantener múltiples fuentes editables de verdad para el mismo saldo. Definir explícitamente si cada balance se obtiene de movimientos + saldo inicial o si se maneja como saldo actual con reconciliaciones. Guardar los vínculos entre pagos y ciclos, y contemplar pagos parciales/adelantados para evitar duplicaciones.
 
 ## 8. Pantallas iniciales
@@ -264,6 +297,14 @@ Una estructura inicial posible (nombres orientativos):
 **Configuración de cuentas/tarjetas** (pantallas secundarias)
 - Crear y ajustar cuentas, saldo inicial y tarjetas.
 - Editar corte, vencimientos y pagos previstos.
+- Registrar una compra MSI y revisar sus cuotas por ciclo.
+
+**Simulador**
+- Capturar compra hipotética y comparar liquidez base frente a escenario.
+- Descartar el escenario sin modificar datos reales.
+
+**Estadísticas**
+- Resumen mensual simple de ingresos, gastos, diferencia neta y pagos de tarjeta realizados.
 
 ## 9. Criterios de aceptación
 
@@ -281,6 +322,13 @@ Una estructura inicial posible (nombres orientativos):
 - [ ] Las recurrencias solo producen movimientos definidos explícitamente.
 - [ ] No existen estimaciones automáticas de gastos diarios ni movimientos inventados.
 - [ ] La gráfica permite seleccionar días y consultar el saldo exacto proyectado.
+- [ ] Una compra MSI aumenta la deuda total una sola vez y distribuye el importe exacto entre los ciclos confirmados.
+- [ ] Las cuotas MSI no disminuyen liquidez antes de sus pagos programados o realizados.
+- [ ] Corregir o eliminar una compra MSI ajusta sus cuotas sin dejar obligaciones duplicadas.
+- [ ] Simular una compra muestra la diferencia frente a la proyección base sin escribir movimientos ni cambiar saldos.
+- [ ] Descartar una simulación recupera la curva base sin cambios.
+- [ ] Las estadísticas mensuales usan solo registros realizados y no duplican compras de crédito con sus pagos.
+- [ ] No se muestran pronósticos de hábitos ni análisis con IA.
 
 ## 10. Orientación de implementación
 
@@ -291,14 +339,19 @@ Separar al menos:
 1. Persistencia de cuentas/movimientos/ciclos.
 2. Cálculo de recurrencias y calendario de pagos.
 3. Motor puro de proyección por días.
-4. Interfaz de captura y gráfica.
+4. Distribución determinista de MSI por ciclos confirmados.
+5. Simulación efímera calculada sobre una copia del estado, sin persistencia.
+6. Agregaciones mensuales simples desde movimientos realizados.
+7. Interfaz de captura, gráfica, simulador y estadísticas.
 
-Preferir operaciones reproducibles y pruebas unitarias en el motor financiero; la interfaz no debe recalcular por su cuenta reglas monetarias.
+Los formularios y paneles deslizables desde la parte inferior deben usar **`@gorhom/bottom-sheet`**, reutilizando el proveedor ya instalado en la app. Los diálogos breves de confirmación pueden seguir usando alertas nativas.
+
+Preferir operaciones reproducibles; la interfaz no debe recalcular por su cuenta reglas monetarias. **No añadir ni ejecutar tests en esta etapa**, según la preferencia actual del usuario.
 
 ## 11. Instrucciones para Codex
 
 1. Primero inspecciona la estructura del repositorio y sus convenciones.
 2. Usa este documento como **especificación funcional**, no como autorización para rehacer arquitectura existente.
-3. Identifica las decisiones pendientes (especialmente la política automática/manual de pagos y si MSI entra en v1) antes de asumir comportamiento.
-4. Propón una implementación incremental: datos y reglas → proyección → tarjetas → UI.
-5. Mantén el MVP pequeño y no agregues características de pronóstico, IA, sincronización bancaria ni estadísticas no solicitadas.
+3. Mantén pendiente la política automática/manual de pagos; **MSI, simulador y estadísticas sencillas sí forman parte del MVP**.
+4. Implementa por partes: datos y reglas → proyección → tarjetas y MSI → simulador → estadísticas → UI.
+5. No agregues pronósticos de hábitos, análisis con IA ni sincronización bancaria.
