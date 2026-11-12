@@ -1,18 +1,10 @@
 import { Feather } from '@expo/vector-icons'
+import { BottomSheetTextInput as TextInput } from '@gorhom/bottom-sheet'
 import { useRouter } from 'expo-router'
 import { useState } from 'react'
-import {
-  Alert,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-} from 'react-native'
+import { Alert, Pressable, ScrollView, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { AppBottomSheet } from '@/components/ui/AppBottomSheet'
 import { isDateKey, localDateKey } from '@/features/finance/dates'
 import {
   type CompletedMovement,
@@ -295,110 +287,127 @@ export default function MovementsScreen() {
         })}
       </ScrollView>
 
-      <Modal
+      <AppBottomSheet
         visible={editing !== undefined}
-        transparent
-        animationType='slide'
-        onRequestClose={() => setEditing(undefined)}
+        onClose={() => setEditing(undefined)}
+        snapPoints={[
+          '80%',
+          '94%',
+        ]}
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={{
-            flex: 1,
-            justifyContent: 'flex-end',
-            backgroundColor: 'rgba(0,0,0,0.28)',
-          }}
-        >
-          <ScrollView
-            keyboardShouldPersistTaps='handled'
-            contentContainerStyle={{
-              flexGrow: 1,
-              justifyContent: 'flex-end',
+        <View>
+          <Text
+            style={{
+              fontFamily: semibold,
+              fontSize: 21,
+              color: INK,
             }}
           >
-            <View
-              style={{
-                backgroundColor: '#fff',
-                borderTopLeftRadius: 24,
-                borderTopRightRadius: 24,
-                padding: 24,
-                paddingBottom: 36,
-              }}
-            >
-              <Text
+            {editing ? 'Editar movimiento' : 'Movimiento realizado'}
+          </Text>
+          <View
+            style={{
+              flexDirection: 'row',
+              gap: 10,
+              marginTop: 24,
+            }}
+          >
+            {(
+              [
+                'expense',
+                'income',
+                'transfer',
+              ] as const
+            ).map((value) => (
+              <Pressable
+                key={value}
+                onPress={() => setType(value)}
                 style={{
-                  fontFamily: semibold,
-                  fontSize: 21,
-                  color: INK,
+                  flex: 1,
+                  paddingVertical: 12,
+                  borderRadius: 10,
+                  backgroundColor: type === value ? INK : '#f3f3f3',
+                  alignItems: 'center',
                 }}
               >
-                {editing ? 'Editar movimiento' : 'Movimiento realizado'}
-              </Text>
-              <View
+                <Text
+                  style={{
+                    fontFamily: medium,
+                    color: type === value ? '#fff' : INK,
+                  }}
+                >
+                  {value === 'expense' ? 'Gasto' : value === 'income' ? 'Ingreso' : 'Transferir'}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          <Text
+            style={{
+              marginTop: 22,
+              fontFamily: medium,
+              fontSize: 13,
+              color: MUTED,
+            }}
+          >
+            Importe
+          </Text>
+          <TextInput
+            value={amount}
+            onChangeText={setAmount}
+            keyboardType='decimal-pad'
+            placeholder='0.00'
+            placeholderTextColor='#bbb'
+            style={{
+              borderBottomWidth: 1,
+              borderBottomColor: '#ddd',
+              fontFamily: medium,
+              fontSize: 30,
+              paddingVertical: 10,
+              color: INK,
+            }}
+          />
+          <Text
+            style={{
+              marginTop: 22,
+              fontFamily: medium,
+              fontSize: 13,
+              color: MUTED,
+            }}
+          >
+            Cuenta
+          </Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={{
+              marginTop: 10,
+            }}
+          >
+            {ledger.accounts.map((account) => (
+              <Pressable
+                key={account.id}
+                onPress={() => setAccountId(account.id)}
                 style={{
-                  flexDirection: 'row',
-                  gap: 10,
-                  marginTop: 24,
-                }}
-              >
-                {(
-                  [
-                    'expense',
-                    'income',
-                    'transfer',
-                  ] as const
-                ).map((value) => (
-                  <Pressable
-                    key={value}
-                    onPress={() => setType(value)}
-                    style={{
-                      flex: 1,
-                      paddingVertical: 12,
-                      borderRadius: 10,
-                      backgroundColor: type === value ? INK : '#f3f3f3',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <Text
-                      style={{
-                        fontFamily: medium,
-                        color: type === value ? '#fff' : INK,
-                      }}
-                    >
-                      {value === 'expense'
-                        ? 'Gasto'
-                        : value === 'income'
-                          ? 'Ingreso'
-                          : 'Transferir'}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-              <Text
-                style={{
-                  marginTop: 22,
-                  fontFamily: medium,
-                  fontSize: 13,
-                  color: MUTED,
-                }}
-              >
-                Importe
-              </Text>
-              <TextInput
-                value={amount}
-                onChangeText={setAmount}
-                keyboardType='decimal-pad'
-                placeholder='0.00'
-                placeholderTextColor='#bbb'
-                style={{
-                  borderBottomWidth: 1,
-                  borderBottomColor: '#ddd',
-                  fontFamily: medium,
-                  fontSize: 30,
+                  marginRight: 8,
+                  paddingHorizontal: 14,
                   paddingVertical: 10,
-                  color: INK,
+                  borderRadius: 9,
+                  backgroundColor: accountId === account.id ? INK : '#f3f3f3',
                 }}
-              />
+              >
+                <Text
+                  style={{
+                    fontFamily: medium,
+                    color: accountId === account.id ? '#fff' : INK,
+                  }}
+                >
+                  {account.name}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+          {type === 'transfer' && (
+            <>
               <Text
                 style={{
                   marginTop: 22,
@@ -407,7 +416,7 @@ export default function MovementsScreen() {
                   color: MUTED,
                 }}
               >
-                Cuenta
+                Cuenta de destino
               </Text>
               <ScrollView
                 horizontal
@@ -416,184 +425,140 @@ export default function MovementsScreen() {
                   marginTop: 10,
                 }}
               >
-                {ledger.accounts.map((account) => (
-                  <Pressable
-                    key={account.id}
-                    onPress={() => setAccountId(account.id)}
-                    style={{
-                      marginRight: 8,
-                      paddingHorizontal: 14,
-                      paddingVertical: 10,
-                      borderRadius: 9,
-                      backgroundColor: accountId === account.id ? INK : '#f3f3f3',
-                    }}
-                  >
-                    <Text
+                {ledger.accounts
+                  .filter((account) => account.id !== accountId)
+                  .map((account) => (
+                    <Pressable
+                      key={account.id}
+                      onPress={() => setCounterpartyAccountId(account.id)}
                       style={{
-                        fontFamily: medium,
-                        color: accountId === account.id ? '#fff' : INK,
+                        marginRight: 8,
+                        paddingHorizontal: 14,
+                        paddingVertical: 10,
+                        borderRadius: 9,
+                        backgroundColor: counterpartyAccountId === account.id ? INK : '#f3f3f3',
                       }}
                     >
-                      {account.name}
-                    </Text>
-                  </Pressable>
-                ))}
+                      <Text
+                        style={{
+                          fontFamily: medium,
+                          color: counterpartyAccountId === account.id ? '#fff' : INK,
+                        }}
+                      >
+                        {account.name}
+                      </Text>
+                    </Pressable>
+                  ))}
               </ScrollView>
-              {type === 'transfer' && (
-                <>
-                  <Text
-                    style={{
-                      marginTop: 22,
-                      fontFamily: medium,
-                      fontSize: 13,
-                      color: MUTED,
-                    }}
-                  >
-                    Cuenta de destino
-                  </Text>
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    style={{
-                      marginTop: 10,
-                    }}
-                  >
-                    {ledger.accounts
-                      .filter((account) => account.id !== accountId)
-                      .map((account) => (
-                        <Pressable
-                          key={account.id}
-                          onPress={() => setCounterpartyAccountId(account.id)}
-                          style={{
-                            marginRight: 8,
-                            paddingHorizontal: 14,
-                            paddingVertical: 10,
-                            borderRadius: 9,
-                            backgroundColor: counterpartyAccountId === account.id ? INK : '#f3f3f3',
-                          }}
-                        >
-                          <Text
-                            style={{
-                              fontFamily: medium,
-                              color: counterpartyAccountId === account.id ? '#fff' : INK,
-                            }}
-                          >
-                            {account.name}
-                          </Text>
-                        </Pressable>
-                      ))}
-                  </ScrollView>
-                </>
-              )}
+            </>
+          )}
+          <Text
+            style={{
+              marginTop: 22,
+              fontFamily: medium,
+              fontSize: 13,
+              color: MUTED,
+            }}
+          >
+            Fecha (AAAA-MM-DD)
+          </Text>
+          <TextInput
+            value={date}
+            onChangeText={setDate}
+            keyboardType='numbers-and-punctuation'
+            style={{
+              borderBottomWidth: 1,
+              borderBottomColor: '#ddd',
+              fontFamily: regular,
+              fontSize: 16,
+              paddingVertical: 10,
+              color: INK,
+            }}
+          />
+          <Text
+            style={{
+              marginTop: 22,
+              fontFamily: medium,
+              fontSize: 13,
+              color: MUTED,
+            }}
+          >
+            Concepto (opcional)
+          </Text>
+          <TextInput
+            value={description}
+            onChangeText={setDescription}
+            placeholder='¿De qué se trata?'
+            placeholderTextColor='#bbb'
+            maxLength={80}
+            style={{
+              borderBottomWidth: 1,
+              borderBottomColor: '#ddd',
+              fontFamily: regular,
+              fontSize: 16,
+              paddingVertical: 10,
+              color: INK,
+            }}
+          />
+          {!!error && (
+            <Text
+              style={{
+                marginTop: 12,
+                fontFamily: regular,
+                color: '#c84242',
+              }}
+            >
+              {error}
+            </Text>
+          )}
+          <View
+            style={{
+              flexDirection: 'row',
+              gap: 10,
+              marginTop: 28,
+            }}
+          >
+            <Pressable
+              onPress={() => setEditing(undefined)}
+              style={{
+                flex: 1,
+                height: 50,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
               <Text
                 style={{
-                  marginTop: 22,
                   fontFamily: medium,
-                  fontSize: 13,
                   color: MUTED,
                 }}
               >
-                Fecha (AAAA-MM-DD)
+                Cancelar
               </Text>
-              <TextInput
-                value={date}
-                onChangeText={setDate}
-                keyboardType='numbers-and-punctuation'
-                style={{
-                  borderBottomWidth: 1,
-                  borderBottomColor: '#ddd',
-                  fontFamily: regular,
-                  fontSize: 16,
-                  paddingVertical: 10,
-                  color: INK,
-                }}
-              />
+            </Pressable>
+            <Pressable
+              onPress={save}
+              style={{
+                flex: 1,
+                height: 50,
+                backgroundColor: INK,
+                borderRadius: 12,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
               <Text
                 style={{
-                  marginTop: 22,
                   fontFamily: medium,
-                  fontSize: 13,
-                  color: MUTED,
+                  color: '#fff',
                 }}
               >
-                Concepto (opcional)
+                Guardar
               </Text>
-              <TextInput
-                value={description}
-                onChangeText={setDescription}
-                placeholder='¿De qué se trata?'
-                placeholderTextColor='#bbb'
-                maxLength={80}
-                style={{
-                  borderBottomWidth: 1,
-                  borderBottomColor: '#ddd',
-                  fontFamily: regular,
-                  fontSize: 16,
-                  paddingVertical: 10,
-                  color: INK,
-                }}
-              />
-              {!!error && (
-                <Text
-                  style={{
-                    marginTop: 12,
-                    fontFamily: regular,
-                    color: '#c84242',
-                  }}
-                >
-                  {error}
-                </Text>
-              )}
-              <View
-                style={{
-                  flexDirection: 'row',
-                  gap: 10,
-                  marginTop: 28,
-                }}
-              >
-                <Pressable
-                  onPress={() => setEditing(undefined)}
-                  style={{
-                    flex: 1,
-                    height: 50,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontFamily: medium,
-                      color: MUTED,
-                    }}
-                  >
-                    Cancelar
-                  </Text>
-                </Pressable>
-                <Pressable
-                  onPress={save}
-                  style={{
-                    flex: 1,
-                    height: 50,
-                    backgroundColor: INK,
-                    borderRadius: 12,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontFamily: medium,
-                      color: '#fff',
-                    }}
-                  >
-                    Guardar
-                  </Text>
-                </Pressable>
-              </View>
-            </View>
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </Modal>
+            </Pressable>
+          </View>
+        </View>
+      </AppBottomSheet>
     </SafeAreaView>
   )
 }

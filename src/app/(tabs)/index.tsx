@@ -1,21 +1,12 @@
 import { Feather } from '@expo/vector-icons'
+import { BottomSheetTextInput as TextInput } from '@gorhom/bottom-sheet'
 import { useFocusEffect } from '@react-navigation/native'
 import { useRouter } from 'expo-router'
 import { useCallback, useMemo, useState } from 'react'
-import {
-  Alert,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  useWindowDimensions,
-  View,
-} from 'react-native'
+import { Alert, Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import Svg, { Circle, Line, Path } from 'react-native-svg'
+import { AppBottomSheet } from '@/components/ui/AppBottomSheet'
 import { localDateKey } from '@/features/finance/dates'
 import { liquidityHistory } from '@/features/finance/history'
 import {
@@ -848,128 +839,114 @@ export default function HomeTab() {
         onSave={addMovement}
       />
 
-      <Modal
+      <AppBottomSheet
         visible={balanceModalVisible}
-        transparent
-        animationType='fade'
-        onRequestClose={() => setBalanceModalVisible(false)}
+        onClose={() => setBalanceModalVisible(false)}
+        snapPoints={[
+          '50%',
+          '68%',
+        ]}
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={{
-            flex: 1,
-            justifyContent: 'center',
-            backgroundColor: 'rgba(0,0,0,0.28)',
-            padding: 24,
-          }}
-        >
-          <View
+        <View>
+          <Text
             style={{
-              borderRadius: 22,
-              backgroundColor: '#fff',
-              padding: 24,
+              color: INK,
+              fontFamily: font.semibold,
+              fontSize: 21,
             }}
           >
+            Saldo disponible
+          </Text>
+          <Text
+            style={{
+              color: MUTED,
+              fontFamily: font.regular,
+              fontSize: 14,
+              marginTop: 8,
+              lineHeight: 21,
+            }}
+          >
+            Ingresa el dinero que tienes hoy en efectivo y cuentas de débito.
+          </Text>
+          <TextInput
+            autoFocus
+            keyboardType='decimal-pad'
+            placeholder='0.00'
+            placeholderTextColor='#b0b0b0'
+            value={balanceInput}
+            onChangeText={(value) => {
+              setBalanceInput(value)
+              setInputError(false)
+            }}
+            style={{
+              borderBottomWidth: 1,
+              borderBottomColor: inputError ? '#c84242' : '#ddd',
+              color: INK,
+              fontFamily: font.medium,
+              fontSize: 34,
+              marginTop: 22,
+              paddingVertical: 10,
+            }}
+          />
+          {inputError && (
             <Text
               style={{
-                color: INK,
-                fontFamily: font.semibold,
-                fontSize: 21,
-              }}
-            >
-              Saldo disponible
-            </Text>
-            <Text
-              style={{
-                color: MUTED,
+                color: '#c84242',
                 fontFamily: font.regular,
-                fontSize: 14,
-                marginTop: 8,
-                lineHeight: 21,
+                marginTop: 6,
               }}
             >
-              Ingresa el dinero que tienes hoy en efectivo y cuentas de débito.
+              Ingresa un importe válido con hasta dos decimales.
             </Text>
-            <TextInput
-              autoFocus
-              keyboardType='decimal-pad'
-              placeholder='0.00'
-              placeholderTextColor='#b0b0b0'
-              value={balanceInput}
-              onChangeText={(value) => {
-                setBalanceInput(value)
-                setInputError(false)
-              }}
+          )}
+          <View
+            style={{
+              flexDirection: 'row',
+              gap: 12,
+              marginTop: 28,
+            }}
+          >
+            <Pressable
+              onPress={() => setBalanceModalVisible(false)}
               style={{
-                borderBottomWidth: 1,
-                borderBottomColor: inputError ? '#c84242' : '#ddd',
-                color: INK,
-                fontFamily: font.medium,
-                fontSize: 34,
-                marginTop: 22,
-                paddingVertical: 10,
+                flex: 1,
+                height: 48,
+                justifyContent: 'center',
+                alignItems: 'center',
               }}
-            />
-            {inputError && (
+            >
               <Text
                 style={{
-                  color: '#c84242',
-                  fontFamily: font.regular,
-                  marginTop: 6,
+                  fontFamily: font.medium,
+                  color: MUTED,
                 }}
               >
-                Ingresa un importe válido con hasta dos decimales.
+                Cancelar
               </Text>
-            )}
-            <View
+            </Pressable>
+            <Pressable
+              onPress={saveBalance}
               style={{
-                flexDirection: 'row',
-                gap: 12,
-                marginTop: 28,
+                flex: 1,
+                height: 48,
+                borderRadius: 12,
+                backgroundColor: INK,
+                justifyContent: 'center',
+                alignItems: 'center',
               }}
             >
-              <Pressable
-                onPress={() => setBalanceModalVisible(false)}
+              <Text
                 style={{
-                  flex: 1,
-                  height: 48,
-                  justifyContent: 'center',
-                  alignItems: 'center',
+                  fontFamily: font.medium,
+                  color: '#fff',
                 }}
               >
-                <Text
-                  style={{
-                    fontFamily: font.medium,
-                    color: MUTED,
-                  }}
-                >
-                  Cancelar
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={saveBalance}
-                style={{
-                  flex: 1,
-                  height: 48,
-                  borderRadius: 12,
-                  backgroundColor: INK,
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                }}
-              >
-                <Text
-                  style={{
-                    fontFamily: font.medium,
-                    color: '#fff',
-                  }}
-                >
-                  Guardar
-                </Text>
-              </Pressable>
-            </View>
+                Guardar
+              </Text>
+            </Pressable>
           </View>
-        </KeyboardAvoidingView>
-      </Modal>
+        </View>
+      </AppBottomSheet>
     </SafeAreaView>
   )
 }

@@ -1,14 +1,7 @@
+import { BottomSheetTextInput as TextInput } from '@gorhom/bottom-sheet'
 import { useEffect, useState } from 'react'
-import {
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-} from 'react-native'
+import { Pressable, ScrollView, Text, View } from 'react-native'
+import { AppBottomSheet } from '@/components/ui/AppBottomSheet'
 import { addDaysKey, isDateKey } from './dates'
 import type { LiquidAccount } from './ledger'
 import { parseAmount } from './money'
@@ -116,445 +109,426 @@ export function ScheduledMovementModal({
   }
 
   return (
-    <Modal visible={visible} transparent animationType='slide' onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={{
-          flex: 1,
-          justifyContent: 'flex-end',
-          backgroundColor: 'rgba(0,0,0,0.28)',
-        }}
-      >
-        <ScrollView
-          keyboardShouldPersistTaps='handled'
-          contentContainerStyle={{
-            flexGrow: 1,
-            justifyContent: 'flex-end',
+    <AppBottomSheet
+      visible={visible}
+      onClose={onClose}
+      snapPoints={[
+        '80%',
+        '94%',
+      ]}
+    >
+      <View>
+        <View
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
           }}
         >
-          <View
+          <Text
             style={{
-              backgroundColor: '#fff',
-              borderTopLeftRadius: 24,
-              borderTopRightRadius: 24,
-              paddingHorizontal: 24,
-              paddingTop: 26,
-              paddingBottom: 36,
+              fontFamily: semibold,
+              fontSize: 21,
+              color: INK,
             }}
           >
-            <View
-              style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}
-            >
-              <Text
-                style={{
-                  fontFamily: semibold,
-                  fontSize: 21,
-                  color: INK,
-                }}
-              >
-                {initial ? 'Editar movimiento' : 'Programar movimiento'}
-              </Text>
-              <Pressable onPress={onClose} accessibilityRole='button' accessibilityLabel='Cerrar'>
-                <Text
-                  style={{
-                    fontFamily: regular,
-                    fontSize: 25,
-                    color: MUTED,
-                  }}
-                >
-                  ×
-                </Text>
-              </Pressable>
-            </View>
+            {initial ? 'Editar movimiento' : 'Programar movimiento'}
+          </Text>
+          <Pressable onPress={onClose} accessibilityRole='button' accessibilityLabel='Cerrar'>
             <Text
               style={{
                 fontFamily: regular,
-                fontSize: 13,
+                fontSize: 25,
                 color: MUTED,
-                marginTop: 5,
               }}
             >
-              Solo se reflejará en la liquidez desde la fecha indicada.
+              ×
             </Text>
+          </Pressable>
+        </View>
+        <Text
+          style={{
+            fontFamily: regular,
+            fontSize: 13,
+            color: MUTED,
+            marginTop: 5,
+          }}
+        >
+          Solo se reflejará en la liquidez desde la fecha indicada.
+        </Text>
 
-            <View
-              style={{
-                flexDirection: 'row',
-                gap: 10,
-                marginTop: 26,
-              }}
-            >
-              {(
-                [
-                  'expense',
-                  'income',
-                  'transfer',
-                ] as const
-              ).map((value) => (
-                <Pressable
-                  key={value}
-                  onPress={() => setType(value)}
-                  style={{
-                    flex: 1,
-                    paddingVertical: 12,
-                    borderRadius: 11,
-                    alignItems: 'center',
-                    backgroundColor: type === value ? INK : '#f3f3f3',
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontFamily: medium,
-                      color: type === value ? '#fff' : INK,
-                    }}
-                  >
-                    {value === 'expense' ? 'Gasto' : value === 'income' ? 'Ingreso' : 'Transferir'}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-
-            <Text
-              style={{
-                fontFamily: medium,
-                color: MUTED,
-                fontSize: 13,
-                marginTop: 26,
-              }}
-            >
-              Importe
-            </Text>
-            <TextInput
-              autoFocus
-              keyboardType='decimal-pad'
-              value={amount}
-              onChangeText={(value) => {
-                setAmount(value)
-                setError('')
-              }}
-              placeholder='0.00'
-              placeholderTextColor='#b9b9b9'
-              style={{
-                borderBottomWidth: 1,
-                borderBottomColor: '#e3e3e3',
-                paddingVertical: 10,
-                color: INK,
-                fontFamily: medium,
-                fontSize: 34,
-              }}
-            />
-
-            <Text
-              style={{
-                fontFamily: medium,
-                color: MUTED,
-                fontSize: 13,
-                marginTop: 25,
-              }}
-            >
-              Cuenta
-            </Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={{
-                marginTop: 10,
-              }}
-            >
-              {accounts.map((account) => (
-                <Pressable
-                  key={account.id}
-                  onPress={() => setAccountId(account.id)}
-                  style={{
-                    marginRight: 8,
-                    paddingHorizontal: 14,
-                    paddingVertical: 10,
-                    borderRadius: 9,
-                    backgroundColor: accountId === account.id ? INK : '#f3f3f3',
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontFamily: medium,
-                      color: accountId === account.id ? '#fff' : INK,
-                    }}
-                  >
-                    {account.name}
-                  </Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-
-            {type === 'transfer' && (
-              <>
-                <Text
-                  style={{
-                    fontFamily: medium,
-                    color: MUTED,
-                    fontSize: 13,
-                    marginTop: 25,
-                  }}
-                >
-                  Cuenta de destino
-                </Text>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  style={{
-                    marginTop: 10,
-                  }}
-                >
-                  {accounts
-                    .filter((account) => account.id !== accountId)
-                    .map((account) => (
-                      <Pressable
-                        key={account.id}
-                        onPress={() => setCounterpartyAccountId(account.id)}
-                        style={{
-                          marginRight: 8,
-                          paddingHorizontal: 14,
-                          paddingVertical: 10,
-                          borderRadius: 9,
-                          backgroundColor: counterpartyAccountId === account.id ? INK : '#f3f3f3',
-                        }}
-                      >
-                        <Text
-                          style={{
-                            fontFamily: medium,
-                            color: counterpartyAccountId === account.id ? '#fff' : INK,
-                          }}
-                        >
-                          {account.name}
-                        </Text>
-                      </Pressable>
-                    ))}
-                </ScrollView>
-              </>
-            )}
-
-            <Text
-              style={{
-                fontFamily: medium,
-                color: MUTED,
-                fontSize: 13,
-                marginTop: 25,
-              }}
-            >
-              Fecha
-            </Text>
-            <View
-              style={{
-                flexDirection: 'row',
-                gap: 8,
-                marginTop: 11,
-              }}
-            >
-              {(
-                [
-                  [
-                    'tomorrow',
-                    'Mañana',
-                  ],
-                  [
-                    'week',
-                    'En 7 días',
-                  ],
-                  [
-                    'custom',
-                    'Otra fecha',
-                  ],
-                ] as const
-              ).map(([value, label]) => (
-                <Pressable
-                  key={value}
-                  onPress={() => setDateChoice(value)}
-                  style={{
-                    paddingVertical: 9,
-                    paddingHorizontal: 12,
-                    borderRadius: 9,
-                    backgroundColor: dateChoice === value ? '#e8e8e8' : '#f7f7f7',
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontFamily: medium,
-                      color: INK,
-                      fontSize: 12,
-                    }}
-                  >
-                    {label}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-            {dateChoice === 'custom' && (
-              <TextInput
-                value={customDate}
-                onChangeText={(value) => {
-                  setCustomDate(value)
-                  setError('')
-                }}
-                placeholder='AAAA-MM-DD'
-                placeholderTextColor='#b9b9b9'
-                keyboardType='numbers-and-punctuation'
-                autoCapitalize='none'
-                style={{
-                  borderBottomWidth: 1,
-                  borderBottomColor: '#e3e3e3',
-                  marginTop: 12,
-                  paddingVertical: 10,
-                  color: INK,
-                  fontFamily: regular,
-                  fontSize: 16,
-                }}
-              />
-            )}
-
-            <Text
-              style={{
-                fontFamily: medium,
-                color: MUTED,
-                fontSize: 13,
-                marginTop: 25,
-              }}
-            >
-              Repetición
-            </Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={{
-                marginTop: 10,
-              }}
-            >
-              {(
-                [
-                  [
-                    undefined,
-                    'Una vez',
-                  ],
-                  [
-                    'weekly',
-                    'Semanal',
-                  ],
-                  [
-                    'biweekly',
-                    'Quincenal',
-                  ],
-                  [
-                    'monthly',
-                    'Mensual',
-                  ],
-                ] as const
-              ).map(([value, label]) => (
-                <Pressable
-                  key={value ?? 'once'}
-                  onPress={() => setRecurrence(value)}
-                  style={{
-                    marginRight: 8,
-                    paddingHorizontal: 12,
-                    paddingVertical: 10,
-                    borderRadius: 9,
-                    backgroundColor: recurrence === value ? INK : '#f3f3f3',
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontFamily: medium,
-                      color: recurrence === value ? '#fff' : INK,
-                      fontSize: 12,
-                    }}
-                  >
-                    {label}
-                  </Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-            {recurrence && (
-              <TextInput
-                value={endDateInput}
-                onChangeText={setEndDateInput}
-                placeholder='Termina el (AAAA-MM-DD), opcional'
-                placeholderTextColor='#b9b9b9'
-                keyboardType='numbers-and-punctuation'
-                style={{
-                  borderBottomWidth: 1,
-                  borderBottomColor: '#e3e3e3',
-                  marginTop: 12,
-                  paddingVertical: 10,
-                  color: INK,
-                  fontFamily: regular,
-                  fontSize: 14,
-                }}
-              />
-            )}
-
-            <Text
-              style={{
-                fontFamily: medium,
-                color: MUTED,
-                fontSize: 13,
-                marginTop: 25,
-              }}
-            >
-              Concepto (opcional)
-            </Text>
-            <TextInput
-              value={description}
-              onChangeText={setDescription}
-              placeholder='¿De qué se trata?'
-              placeholderTextColor='#b9b9b9'
-              maxLength={80}
-              style={{
-                borderBottomWidth: 1,
-                borderBottomColor: '#e3e3e3',
-                paddingVertical: 10,
-                color: INK,
-                fontFamily: regular,
-                fontSize: 16,
-              }}
-            />
-
-            {!!error && (
-              <Text
-                style={{
-                  color: '#c84242',
-                  fontFamily: regular,
-                  fontSize: 13,
-                  marginTop: 14,
-                }}
-              >
-                {error}
-              </Text>
-            )}
+        <View
+          style={{
+            flexDirection: 'row',
+            gap: 10,
+            marginTop: 26,
+          }}
+        >
+          {(
+            [
+              'expense',
+              'income',
+              'transfer',
+            ] as const
+          ).map((value) => (
             <Pressable
-              onPress={save}
+              key={value}
+              onPress={() => setType(value)}
               style={{
-                height: 52,
-                borderRadius: 12,
-                backgroundColor: INK,
+                flex: 1,
+                paddingVertical: 12,
+                borderRadius: 11,
                 alignItems: 'center',
-                justifyContent: 'center',
-                marginTop: 28,
+                backgroundColor: type === value ? INK : '#f3f3f3',
               }}
             >
               <Text
                 style={{
                   fontFamily: medium,
-                  color: '#fff',
-                  fontSize: 15,
+                  color: type === value ? '#fff' : INK,
                 }}
               >
-                Guardar movimiento
+                {value === 'expense' ? 'Gasto' : value === 'income' ? 'Ingreso' : 'Transferir'}
               </Text>
             </Pressable>
-          </View>
+          ))}
+        </View>
+
+        <Text
+          style={{
+            fontFamily: medium,
+            color: MUTED,
+            fontSize: 13,
+            marginTop: 26,
+          }}
+        >
+          Importe
+        </Text>
+        <TextInput
+          autoFocus
+          keyboardType='decimal-pad'
+          value={amount}
+          onChangeText={(value) => {
+            setAmount(value)
+            setError('')
+          }}
+          placeholder='0.00'
+          placeholderTextColor='#b9b9b9'
+          style={{
+            borderBottomWidth: 1,
+            borderBottomColor: '#e3e3e3',
+            paddingVertical: 10,
+            color: INK,
+            fontFamily: medium,
+            fontSize: 34,
+          }}
+        />
+
+        <Text
+          style={{
+            fontFamily: medium,
+            color: MUTED,
+            fontSize: 13,
+            marginTop: 25,
+          }}
+        >
+          Cuenta
+        </Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={{
+            marginTop: 10,
+          }}
+        >
+          {accounts.map((account) => (
+            <Pressable
+              key={account.id}
+              onPress={() => setAccountId(account.id)}
+              style={{
+                marginRight: 8,
+                paddingHorizontal: 14,
+                paddingVertical: 10,
+                borderRadius: 9,
+                backgroundColor: accountId === account.id ? INK : '#f3f3f3',
+              }}
+            >
+              <Text
+                style={{
+                  fontFamily: medium,
+                  color: accountId === account.id ? '#fff' : INK,
+                }}
+              >
+                {account.name}
+              </Text>
+            </Pressable>
+          ))}
         </ScrollView>
-      </KeyboardAvoidingView>
-    </Modal>
+
+        {type === 'transfer' && (
+          <>
+            <Text
+              style={{
+                fontFamily: medium,
+                color: MUTED,
+                fontSize: 13,
+                marginTop: 25,
+              }}
+            >
+              Cuenta de destino
+            </Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={{
+                marginTop: 10,
+              }}
+            >
+              {accounts
+                .filter((account) => account.id !== accountId)
+                .map((account) => (
+                  <Pressable
+                    key={account.id}
+                    onPress={() => setCounterpartyAccountId(account.id)}
+                    style={{
+                      marginRight: 8,
+                      paddingHorizontal: 14,
+                      paddingVertical: 10,
+                      borderRadius: 9,
+                      backgroundColor: counterpartyAccountId === account.id ? INK : '#f3f3f3',
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontFamily: medium,
+                        color: counterpartyAccountId === account.id ? '#fff' : INK,
+                      }}
+                    >
+                      {account.name}
+                    </Text>
+                  </Pressable>
+                ))}
+            </ScrollView>
+          </>
+        )}
+
+        <Text
+          style={{
+            fontFamily: medium,
+            color: MUTED,
+            fontSize: 13,
+            marginTop: 25,
+          }}
+        >
+          Fecha
+        </Text>
+        <View
+          style={{
+            flexDirection: 'row',
+            gap: 8,
+            marginTop: 11,
+          }}
+        >
+          {(
+            [
+              [
+                'tomorrow',
+                'Mañana',
+              ],
+              [
+                'week',
+                'En 7 días',
+              ],
+              [
+                'custom',
+                'Otra fecha',
+              ],
+            ] as const
+          ).map(([value, label]) => (
+            <Pressable
+              key={value}
+              onPress={() => setDateChoice(value)}
+              style={{
+                paddingVertical: 9,
+                paddingHorizontal: 12,
+                borderRadius: 9,
+                backgroundColor: dateChoice === value ? '#e8e8e8' : '#f7f7f7',
+              }}
+            >
+              <Text
+                style={{
+                  fontFamily: medium,
+                  color: INK,
+                  fontSize: 12,
+                }}
+              >
+                {label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+        {dateChoice === 'custom' && (
+          <TextInput
+            value={customDate}
+            onChangeText={(value) => {
+              setCustomDate(value)
+              setError('')
+            }}
+            placeholder='AAAA-MM-DD'
+            placeholderTextColor='#b9b9b9'
+            keyboardType='numbers-and-punctuation'
+            autoCapitalize='none'
+            style={{
+              borderBottomWidth: 1,
+              borderBottomColor: '#e3e3e3',
+              marginTop: 12,
+              paddingVertical: 10,
+              color: INK,
+              fontFamily: regular,
+              fontSize: 16,
+            }}
+          />
+        )}
+
+        <Text
+          style={{
+            fontFamily: medium,
+            color: MUTED,
+            fontSize: 13,
+            marginTop: 25,
+          }}
+        >
+          Repetición
+        </Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={{
+            marginTop: 10,
+          }}
+        >
+          {(
+            [
+              [
+                undefined,
+                'Una vez',
+              ],
+              [
+                'weekly',
+                'Semanal',
+              ],
+              [
+                'biweekly',
+                'Quincenal',
+              ],
+              [
+                'monthly',
+                'Mensual',
+              ],
+            ] as const
+          ).map(([value, label]) => (
+            <Pressable
+              key={value ?? 'once'}
+              onPress={() => setRecurrence(value)}
+              style={{
+                marginRight: 8,
+                paddingHorizontal: 12,
+                paddingVertical: 10,
+                borderRadius: 9,
+                backgroundColor: recurrence === value ? INK : '#f3f3f3',
+              }}
+            >
+              <Text
+                style={{
+                  fontFamily: medium,
+                  color: recurrence === value ? '#fff' : INK,
+                  fontSize: 12,
+                }}
+              >
+                {label}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+        {recurrence && (
+          <TextInput
+            value={endDateInput}
+            onChangeText={setEndDateInput}
+            placeholder='Termina el (AAAA-MM-DD), opcional'
+            placeholderTextColor='#b9b9b9'
+            keyboardType='numbers-and-punctuation'
+            style={{
+              borderBottomWidth: 1,
+              borderBottomColor: '#e3e3e3',
+              marginTop: 12,
+              paddingVertical: 10,
+              color: INK,
+              fontFamily: regular,
+              fontSize: 14,
+            }}
+          />
+        )}
+
+        <Text
+          style={{
+            fontFamily: medium,
+            color: MUTED,
+            fontSize: 13,
+            marginTop: 25,
+          }}
+        >
+          Concepto (opcional)
+        </Text>
+        <TextInput
+          value={description}
+          onChangeText={setDescription}
+          placeholder='¿De qué se trata?'
+          placeholderTextColor='#b9b9b9'
+          maxLength={80}
+          style={{
+            borderBottomWidth: 1,
+            borderBottomColor: '#e3e3e3',
+            paddingVertical: 10,
+            color: INK,
+            fontFamily: regular,
+            fontSize: 16,
+          }}
+        />
+
+        {!!error && (
+          <Text
+            style={{
+              color: '#c84242',
+              fontFamily: regular,
+              fontSize: 13,
+              marginTop: 14,
+            }}
+          >
+            {error}
+          </Text>
+        )}
+        <Pressable
+          onPress={save}
+          style={{
+            height: 52,
+            borderRadius: 12,
+            backgroundColor: INK,
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginTop: 28,
+          }}
+        >
+          <Text
+            style={{
+              fontFamily: medium,
+              color: '#fff',
+              fontSize: 15,
+            }}
+          >
+            Guardar movimiento
+          </Text>
+        </Pressable>
+      </View>
+    </AppBottomSheet>
   )
 }

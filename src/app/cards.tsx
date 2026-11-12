@@ -1,19 +1,11 @@
 import { Feather } from '@expo/vector-icons'
+import { BottomSheetTextInput as TextInput } from '@gorhom/bottom-sheet'
 import { useFocusEffect } from '@react-navigation/native'
 import { useRouter } from 'expo-router'
 import { useCallback, useState } from 'react'
-import {
-  Alert,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-} from 'react-native'
+import { Alert, Pressable, ScrollView, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { AppBottomSheet } from '@/components/ui/AppBottomSheet'
 import { isDateKey, localDateKey } from '@/features/finance/dates'
 import {
   addCardActivity,
@@ -655,302 +647,275 @@ export default function CardsScreen() {
           )
         })}
       </ScrollView>
-      <Modal
+      <AppBottomSheet
         visible={mode !== null}
-        transparent
-        animationType='slide'
-        onRequestClose={() => setMode(null)}
+        onClose={() => setMode(null)}
+        snapPoints={[
+          '84%',
+          '94%',
+        ]}
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={{
-            flex: 1,
-            justifyContent: 'flex-end',
-            backgroundColor: 'rgba(0,0,0,0.28)',
-          }}
-        >
-          <ScrollView
-            keyboardShouldPersistTaps='handled'
-            contentContainerStyle={{
-              flexGrow: 1,
-              justifyContent: 'flex-end',
+        <View>
+          <Text
+            style={{
+              fontFamily: semibold,
+              fontSize: 21,
+              color: INK,
             }}
           >
-            <View
+            {mode === 'card'
+              ? 'Nueva tarjeta'
+              : mode === 'settings'
+                ? 'Editar tarjeta'
+                : mode === 'cycle'
+                  ? 'Nuevo ciclo'
+                  : mode === 'purchase'
+                    ? 'Compra con tarjeta'
+                    : mode === 'payment'
+                      ? 'Pago realizado'
+                      : mode === 'plan'
+                        ? 'Programar pago'
+                        : 'Cambiar ciclo'}
+          </Text>
+          {mode === 'card' && (
+            <>
+              <Label>Nombre</Label>
+              <Field value={name} onChangeText={setName} placeholder='Ej. Tarjeta principal' />
+              <Label>Día de corte (1–31)</Label>
+              <Field value={cutoffDay} onChangeText={setCutoffDay} placeholder='12' />
+              <Label>Deuda actual</Label>
+              <Field value={debt} onChangeText={setDebt} placeholder='0.00' decimal />
+              <Label>Saldo facturado pendiente</Label>
+              <Field value={billed} onChangeText={setBilled} placeholder='0.00' decimal />
+              <Text
+                style={{
+                  marginTop: 6,
+                  color: MUTED,
+                  fontFamily: regular,
+                  fontSize: 12,
+                }}
+              >
+                La diferencia es deuda aún no facturada.
+              </Text>
+              <Label>Último corte (AAAA-MM-DD), si hay saldo facturado</Label>
+              <Field value={cutoffDate} onChangeText={setCutoffDate} placeholder='AAAA-MM-DD' />
+              <Label>Fecha límite (AAAA-MM-DD)</Label>
+              <Field value={dueDate} onChangeText={setDueDate} placeholder='AAAA-MM-DD' />
+            </>
+          )}
+          {mode === 'settings' && (
+            <>
+              <Label>Nombre</Label>
+              <Field value={name} onChangeText={setName} placeholder='Nombre de tarjeta' />
+              <Label>Día habitual de corte</Label>
+              <Field value={cutoffDay} onChangeText={setCutoffDay} placeholder='12' />
+            </>
+          )}
+          {mode === 'cycle' && (
+            <>
+              <Label>Fecha de corte (AAAA-MM-DD)</Label>
+              <Field value={cutoffDate} onChangeText={setCutoffDate} placeholder='AAAA-MM-DD' />
+              <Label>Fecha límite de pago (AAAA-MM-DD)</Label>
+              <Field value={dueDate} onChangeText={setDueDate} placeholder='AAAA-MM-DD' />
+              <Label>Deuda previa que se factura en este ciclo (opcional)</Label>
+              <Field value={billed} onChangeText={setBilled} placeholder='0.00' decimal />
+              <Text
+                style={{
+                  marginTop: 6,
+                  fontFamily: regular,
+                  color: MUTED,
+                  fontSize: 12,
+                }}
+              >
+                Pendiente de asignar: {formatMoney(selectedCard?.unbilledOpeningCents ?? 0)}
+              </Text>
+            </>
+          )}
+          {(mode === 'card' || mode === 'settings' || mode === 'payment') && (
+            <>
+              <Label>Cuenta para pagar</Label>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={{
+                  marginTop: 10,
+                }}
+              >
+                {ledger.accounts.map((account) => (
+                  <Pressable
+                    key={account.id}
+                    onPress={() => setSourceAccountId(account.id)}
+                    style={{
+                      marginRight: 8,
+                      paddingHorizontal: 12,
+                      paddingVertical: 10,
+                      borderRadius: 9,
+                      backgroundColor: sourceAccountId === account.id ? INK : '#f3f3f3',
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: sourceAccountId === account.id ? '#fff' : INK,
+                        fontFamily: medium,
+                      }}
+                    >
+                      {account.name}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </>
+          )}
+          {(mode === 'purchase' || mode === 'payment' || mode === 'reassign') && (
+            <>
+              <Label>Ciclo de facturación</Label>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={{
+                  marginTop: 10,
+                }}
+              >
+                {cycles.map((cycle) => (
+                  <Pressable
+                    key={cycle.id}
+                    onPress={() => setSelectedCycleId(cycle.id)}
+                    style={{
+                      marginRight: 8,
+                      paddingHorizontal: 12,
+                      paddingVertical: 10,
+                      borderRadius: 9,
+                      backgroundColor: selectedCycleId === cycle.id ? INK : '#f3f3f3',
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: selectedCycleId === cycle.id ? '#fff' : INK,
+                        fontFamily: medium,
+                      }}
+                    >
+                      {cycle.cutoffDate}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </>
+          )}
+          {(mode === 'purchase' || mode === 'payment') && (
+            <>
+              <Label>Importe</Label>
+              <Field value={amount} onChangeText={setAmount} placeholder='0.00' decimal />
+              <Label>Fecha realizada (AAAA-MM-DD)</Label>
+              <Field value={activityDate} onChangeText={setActivityDate} placeholder='AAAA-MM-DD' />
+              <Label>Concepto (opcional)</Label>
+              <Field
+                value={description}
+                onChangeText={setDescription}
+                placeholder='¿De qué se trata?'
+              />
+            </>
+          )}
+          {mode === 'plan' && (
+            <>
+              <Text
+                style={{
+                  marginTop: 10,
+                  fontFamily: regular,
+                  color: MUTED,
+                  fontSize: 13,
+                }}
+              >
+                {selectedCycle && selectedCycle.cutoffDate > todayKey
+                  ? 'Importe del ciclo'
+                  : 'Facturado'}{' '}
+                {formatMoney(statementAmountCents(ledger, selectedCycleId))} · Ya pagado{' '}
+                {formatMoney(selectedCycle?.paidAmountCents ?? 0)}
+              </Text>
+              <Label>Fecha límite confirmada (AAAA-MM-DD)</Label>
+              <Field value={dueDate} onChangeText={setDueDate} placeholder='AAAA-MM-DD' />
+              <Label>Monto total previsto (0 para quitar)</Label>
+              <Field value={amount} onChangeText={setAmount} placeholder='0.00' decimal />
+              <Label>Fecha prevista (AAAA-MM-DD)</Label>
+              <Field
+                value={scheduledDate}
+                onChangeText={setScheduledDate}
+                placeholder='AAAA-MM-DD'
+              />
+              <Label>Pago para no generar intereses (informativo)</Label>
+              <Field
+                value={paymentToAvoidInterest}
+                onChangeText={setPaymentToAvoidInterest}
+                placeholder='Opcional'
+                decimal
+              />
+              <Label>Pago mínimo (informativo)</Label>
+              <Field
+                value={minimumPayment}
+                onChangeText={setMinimumPayment}
+                placeholder='Opcional'
+                decimal
+              />
+            </>
+          )}
+          {!!error && (
+            <Text
               style={{
-                backgroundColor: '#fff',
-                borderTopLeftRadius: 24,
-                borderTopRightRadius: 24,
-                padding: 24,
-                paddingBottom: 36,
+                marginTop: 14,
+                color: '#c84242',
+                fontFamily: regular,
+              }}
+            >
+              {error}
+            </Text>
+          )}
+          <View
+            style={{
+              flexDirection: 'row',
+              gap: 10,
+              marginTop: 28,
+            }}
+          >
+            <Pressable
+              onPress={() => setMode(null)}
+              style={{
+                flex: 1,
+                height: 50,
+                justifyContent: 'center',
+                alignItems: 'center',
               }}
             >
               <Text
                 style={{
-                  fontFamily: semibold,
-                  fontSize: 21,
-                  color: INK,
+                  fontFamily: medium,
+                  color: MUTED,
                 }}
               >
-                {mode === 'card'
-                  ? 'Nueva tarjeta'
-                  : mode === 'settings'
-                    ? 'Editar tarjeta'
-                    : mode === 'cycle'
-                      ? 'Nuevo ciclo'
-                      : mode === 'purchase'
-                        ? 'Compra con tarjeta'
-                        : mode === 'payment'
-                          ? 'Pago realizado'
-                          : mode === 'plan'
-                            ? 'Programar pago'
-                            : 'Cambiar ciclo'}
+                Cancelar
               </Text>
-              {mode === 'card' && (
-                <>
-                  <Label>Nombre</Label>
-                  <Field value={name} onChangeText={setName} placeholder='Ej. Tarjeta principal' />
-                  <Label>Día de corte (1–31)</Label>
-                  <Field value={cutoffDay} onChangeText={setCutoffDay} placeholder='12' />
-                  <Label>Deuda actual</Label>
-                  <Field value={debt} onChangeText={setDebt} placeholder='0.00' decimal />
-                  <Label>Saldo facturado pendiente</Label>
-                  <Field value={billed} onChangeText={setBilled} placeholder='0.00' decimal />
-                  <Text
-                    style={{
-                      marginTop: 6,
-                      color: MUTED,
-                      fontFamily: regular,
-                      fontSize: 12,
-                    }}
-                  >
-                    La diferencia es deuda aún no facturada.
-                  </Text>
-                  <Label>Último corte (AAAA-MM-DD), si hay saldo facturado</Label>
-                  <Field value={cutoffDate} onChangeText={setCutoffDate} placeholder='AAAA-MM-DD' />
-                  <Label>Fecha límite (AAAA-MM-DD)</Label>
-                  <Field value={dueDate} onChangeText={setDueDate} placeholder='AAAA-MM-DD' />
-                </>
-              )}
-              {mode === 'settings' && (
-                <>
-                  <Label>Nombre</Label>
-                  <Field value={name} onChangeText={setName} placeholder='Nombre de tarjeta' />
-                  <Label>Día habitual de corte</Label>
-                  <Field value={cutoffDay} onChangeText={setCutoffDay} placeholder='12' />
-                </>
-              )}
-              {mode === 'cycle' && (
-                <>
-                  <Label>Fecha de corte (AAAA-MM-DD)</Label>
-                  <Field value={cutoffDate} onChangeText={setCutoffDate} placeholder='AAAA-MM-DD' />
-                  <Label>Fecha límite de pago (AAAA-MM-DD)</Label>
-                  <Field value={dueDate} onChangeText={setDueDate} placeholder='AAAA-MM-DD' />
-                  <Label>Deuda previa que se factura en este ciclo (opcional)</Label>
-                  <Field value={billed} onChangeText={setBilled} placeholder='0.00' decimal />
-                  <Text
-                    style={{
-                      marginTop: 6,
-                      fontFamily: regular,
-                      color: MUTED,
-                      fontSize: 12,
-                    }}
-                  >
-                    Pendiente de asignar: {formatMoney(selectedCard?.unbilledOpeningCents ?? 0)}
-                  </Text>
-                </>
-              )}
-              {(mode === 'card' || mode === 'settings' || mode === 'payment') && (
-                <>
-                  <Label>Cuenta para pagar</Label>
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    style={{
-                      marginTop: 10,
-                    }}
-                  >
-                    {ledger.accounts.map((account) => (
-                      <Pressable
-                        key={account.id}
-                        onPress={() => setSourceAccountId(account.id)}
-                        style={{
-                          marginRight: 8,
-                          paddingHorizontal: 12,
-                          paddingVertical: 10,
-                          borderRadius: 9,
-                          backgroundColor: sourceAccountId === account.id ? INK : '#f3f3f3',
-                        }}
-                      >
-                        <Text
-                          style={{
-                            color: sourceAccountId === account.id ? '#fff' : INK,
-                            fontFamily: medium,
-                          }}
-                        >
-                          {account.name}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </ScrollView>
-                </>
-              )}
-              {(mode === 'purchase' || mode === 'payment' || mode === 'reassign') && (
-                <>
-                  <Label>Ciclo de facturación</Label>
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    style={{
-                      marginTop: 10,
-                    }}
-                  >
-                    {cycles.map((cycle) => (
-                      <Pressable
-                        key={cycle.id}
-                        onPress={() => setSelectedCycleId(cycle.id)}
-                        style={{
-                          marginRight: 8,
-                          paddingHorizontal: 12,
-                          paddingVertical: 10,
-                          borderRadius: 9,
-                          backgroundColor: selectedCycleId === cycle.id ? INK : '#f3f3f3',
-                        }}
-                      >
-                        <Text
-                          style={{
-                            color: selectedCycleId === cycle.id ? '#fff' : INK,
-                            fontFamily: medium,
-                          }}
-                        >
-                          {cycle.cutoffDate}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </ScrollView>
-                </>
-              )}
-              {(mode === 'purchase' || mode === 'payment') && (
-                <>
-                  <Label>Importe</Label>
-                  <Field value={amount} onChangeText={setAmount} placeholder='0.00' decimal />
-                  <Label>Fecha realizada (AAAA-MM-DD)</Label>
-                  <Field
-                    value={activityDate}
-                    onChangeText={setActivityDate}
-                    placeholder='AAAA-MM-DD'
-                  />
-                  <Label>Concepto (opcional)</Label>
-                  <Field
-                    value={description}
-                    onChangeText={setDescription}
-                    placeholder='¿De qué se trata?'
-                  />
-                </>
-              )}
-              {mode === 'plan' && (
-                <>
-                  <Text
-                    style={{
-                      marginTop: 10,
-                      fontFamily: regular,
-                      color: MUTED,
-                      fontSize: 13,
-                    }}
-                  >
-                    {selectedCycle && selectedCycle.cutoffDate > todayKey
-                      ? 'Importe del ciclo'
-                      : 'Facturado'}{' '}
-                    {formatMoney(statementAmountCents(ledger, selectedCycleId))} · Ya pagado{' '}
-                    {formatMoney(selectedCycle?.paidAmountCents ?? 0)}
-                  </Text>
-                  <Label>Fecha límite confirmada (AAAA-MM-DD)</Label>
-                  <Field value={dueDate} onChangeText={setDueDate} placeholder='AAAA-MM-DD' />
-                  <Label>Monto total previsto (0 para quitar)</Label>
-                  <Field value={amount} onChangeText={setAmount} placeholder='0.00' decimal />
-                  <Label>Fecha prevista (AAAA-MM-DD)</Label>
-                  <Field
-                    value={scheduledDate}
-                    onChangeText={setScheduledDate}
-                    placeholder='AAAA-MM-DD'
-                  />
-                  <Label>Pago para no generar intereses (informativo)</Label>
-                  <Field
-                    value={paymentToAvoidInterest}
-                    onChangeText={setPaymentToAvoidInterest}
-                    placeholder='Opcional'
-                    decimal
-                  />
-                  <Label>Pago mínimo (informativo)</Label>
-                  <Field
-                    value={minimumPayment}
-                    onChangeText={setMinimumPayment}
-                    placeholder='Opcional'
-                    decimal
-                  />
-                </>
-              )}
-              {!!error && (
-                <Text
-                  style={{
-                    marginTop: 14,
-                    color: '#c84242',
-                    fontFamily: regular,
-                  }}
-                >
-                  {error}
-                </Text>
-              )}
-              <View
+            </Pressable>
+            <Pressable
+              onPress={save}
+              style={{
+                flex: 1,
+                height: 50,
+                borderRadius: 12,
+                backgroundColor: INK,
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}
+            >
+              <Text
                 style={{
-                  flexDirection: 'row',
-                  gap: 10,
-                  marginTop: 28,
+                  fontFamily: medium,
+                  color: '#fff',
                 }}
               >
-                <Pressable
-                  onPress={() => setMode(null)}
-                  style={{
-                    flex: 1,
-                    height: 50,
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontFamily: medium,
-                      color: MUTED,
-                    }}
-                  >
-                    Cancelar
-                  </Text>
-                </Pressable>
-                <Pressable
-                  onPress={save}
-                  style={{
-                    flex: 1,
-                    height: 50,
-                    borderRadius: 12,
-                    backgroundColor: INK,
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontFamily: medium,
-                      color: '#fff',
-                    }}
-                  >
-                    Guardar
-                  </Text>
-                </Pressable>
-              </View>
-            </View>
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </Modal>
+                Guardar
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </AppBottomSheet>
     </SafeAreaView>
   )
 }
