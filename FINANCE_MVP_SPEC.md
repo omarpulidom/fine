@@ -49,6 +49,8 @@ La gráfica de liquidez es el componente central:
 - Distinguir tramo histórico/actual y tramo proyectado.
 - Mostrar próximos ingresos, gastos y pagos programados.
 - Acceso inmediato a **Añadir movimiento**.
+- Debajo de la gráfica, un módulo de dos columnas de igual ancho con separación: a la izquierda cuatro accesos circulares pequeños sin texto visible (simular compra, estadísticas, historial y registrar movimiento); a la derecha una tarjeta principal negra con la liquidez total y una lengüeta sobre las tarjetas decorativas. Los accesos deben tener etiquetas de accesibilidad.
+- Al tocar la tarjeta principal, desplegar hacia arriba y en una sola columna las cuentas de efectivo/banco y tarjetas de crédito, con iconos genéricos. Cada elemento abre su pantalla de gestión enfocada; las tarjetas de crédito muestran su deuda por separado y no se suman a la liquidez.
 
 **Definición de liquidez para esta pantalla:** dinero disponible en efectivo y cuentas bancarias; una deuda con tarjeta **no** disminuye automáticamente esa liquidez hasta el día de su pago proyectado o efectivo.
 

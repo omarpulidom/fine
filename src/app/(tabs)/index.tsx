@@ -1,5 +1,4 @@
 import { Feather } from "@expo/vector-icons";
-import { BottomSheetTextInput as TextInput } from "@gorhom/bottom-sheet";
 import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
@@ -13,22 +12,16 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Circle, Line, Path } from "react-native-svg";
-import { AppBottomSheet } from "@/components/ui/AppBottomSheet";
+import { AccountsHub } from "@/components/finance/AccountsHub";
 import { formatDateDisplay, localDateKey } from "@/features/finance/dates";
 import { liquidityHistory } from "@/features/finance/history";
 import {
   getLedger,
-  newAccountId,
   newMovementId,
   totalLiquidity,
-  upsertAccount,
   upsertCompletedMovement,
 } from "@/features/finance/ledger";
-import {
-  formatMoney,
-  formatMoneyInput,
-  parseAmount,
-} from "@/features/finance/money";
+import { formatMoney } from "@/features/finance/money";
 import { projectLiquidityBreakdown } from "@/features/finance/projection";
 import { ScheduledMovementModal } from "@/features/finance/ScheduledMovementModal";
 import {
@@ -66,9 +59,6 @@ export default function HomeTab() {
     useState<ScheduledMovement | null>(null);
   const [selectedDay, setSelectedDay] = useState(0);
   const [horizonDays, setHorizonDays] = useState<7 | 30 | 60 | 90>(30);
-  const [balanceModalVisible, setBalanceModalVisible] = useState(false);
-  const [balanceInput, setBalanceInput] = useState("");
-  const [inputError, setInputError] = useState(false);
   const [today, setToday] = useState(() => new Date());
   useFocusEffect(
     useCallback(() => {
@@ -218,30 +208,6 @@ export default function HomeTab() {
         Math.max(0, Math.min(horizonDays, Math.round(ratio * horizonDays))),
       );
     }
-  }
-
-  function openBalanceModal() {
-    setBalanceInput("");
-    setInputError(false);
-    setBalanceModalVisible(true);
-  }
-
-  function saveBalance() {
-    const cents = parseAmount(balanceInput);
-    if (cents === null) {
-      setInputError(true);
-      return;
-    }
-    setLedger(
-      upsertAccount({
-        id: newAccountId(),
-        name: "Cuenta principal",
-        type: "bank",
-        balanceCents: cents,
-        asOfDate: todayKey,
-      }),
-    );
-    setBalanceModalVisible(false);
   }
 
   function addMovement(draft: Omit<ScheduledMovement, "id">) {
@@ -599,188 +565,27 @@ export default function HomeTab() {
           ))}
         </View>
 
-        <View
-          style={{
-            marginTop: 34,
-          }}
-        >
-          <View
-            style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            <Text
-              style={{
-                color: MUTED,
-                fontFamily: font.regular,
-                fontSize: 14,
-              }}
-            >
-              Cuenta disponible
-            </Text>
-            <Text
-              style={{
-                color: MUTED,
-                fontFamily: font.regular,
-                fontSize: 14,
-              }}
-            >
-              {balanceCents === null ? "—" : formatMoney(balanceCents)}
-            </Text>
-          </View>
-          <Pressable
-            onPress={() =>
-              balanceCents === null
-                ? openBalanceModal()
-                : router.push("/accounts")
-            }
-            style={{
-              marginTop: 9,
-              height: 56,
-              borderRadius: 12,
-              backgroundColor: "#fff",
-              flexDirection: "row",
-              alignItems: "center",
-              paddingHorizontal: 18,
-            }}
-            accessibilityRole="button"
-            accessibilityLabel={
-              balanceCents === null ? "Registrar saldo" : "Administrar cuentas"
-            }
-          >
-            <View
-              style={{
-                width: 27,
-                height: 27,
-                borderRadius: 14,
-                backgroundColor: "#f1f1f1",
-                alignItems: "center",
-                justifyContent: "center",
-                marginRight: 14,
-              }}
-            >
-              <Feather name="dollar-sign" size={14} color={INK} />
-            </View>
-            <Text
-              style={{
-                flex: 1,
-                color: INK,
-                fontFamily: font.medium,
-                fontSize: 15,
-              }}
-            >
-              {balanceCents === null
-                ? "Registrar cuenta principal"
-                : "Administrar cuentas"}
-            </Text>
-            <Feather
-              name={balanceCents === null ? "plus" : "arrow-right"}
-              size={17}
-              color={MUTED}
-            />
-          </Pressable>
-          <Pressable
-            onPress={() => router.push("/cards")}
-            accessibilityRole="button"
-            style={{
-              marginTop: 9,
-              height: 56,
-              borderRadius: 12,
-              backgroundColor: "#fff",
-              flexDirection: "row",
-              alignItems: "center",
-              paddingHorizontal: 18,
-            }}
-          >
-            <Feather
-              name="credit-card"
-              size={17}
-              color={INK}
-              style={{
-                marginRight: 18,
-              }}
-            />
-            <Text
-              style={{
-                flex: 1,
-                color: INK,
-                fontFamily: font.medium,
-                fontSize: 15,
-              }}
-            >
-              Tarjetas de crédito
-            </Text>
-            <Feather name="arrow-right" size={17} color={MUTED} />
-          </Pressable>
-          <Pressable
-            onPress={() => router.push("/simulator")}
-            accessibilityRole="button"
-            style={{
-              marginTop: 9,
-              height: 56,
-              borderRadius: 12,
-              backgroundColor: "#fff",
-              flexDirection: "row",
-              alignItems: "center",
-              paddingHorizontal: 18,
-            }}
-          >
-            <Feather
-              name="activity"
-              size={17}
-              color={INK}
-              style={{
-                marginRight: 18,
-              }}
-            />
-            <Text
-              style={{
-                flex: 1,
-                color: INK,
-                fontFamily: font.medium,
-                fontSize: 15,
-              }}
-            >
-              Simular una compra
-            </Text>
-            <Feather name="arrow-right" size={17} color={MUTED} />
-          </Pressable>
-          <Pressable
-            onPress={() => router.push("/stats")}
-            accessibilityRole="button"
-            style={{
-              marginTop: 9,
-              height: 56,
-              borderRadius: 12,
-              backgroundColor: "#fff",
-              flexDirection: "row",
-              alignItems: "center",
-              paddingHorizontal: 18,
-            }}
-          >
-            <Feather
-              name="bar-chart-2"
-              size={17}
-              color={INK}
-              style={{
-                marginRight: 18,
-              }}
-            />
-            <Text
-              style={{
-                flex: 1,
-                color: INK,
-                fontFamily: font.medium,
-                fontSize: 15,
-              }}
-            >
-              Estadísticas mensuales
-            </Text>
-            <Feather name="arrow-right" size={17} color={MUTED} />
-          </Pressable>
-        </View>
+        <AccountsHub
+          accounts={ledger.accounts}
+          cards={ledger.cards}
+          balanceCents={balanceCents}
+          onSelectAccount={(accountId) =>
+            router.push({ pathname: '/accounts', params: { accountId } })
+          }
+          onSelectCard={(cardId) =>
+            router.push({ pathname: '/cards', params: { cardId } })
+          }
+          onAddAccount={() => router.push('/accounts')}
+          onAddCard={() => router.push('/cards')}
+          onSimulate={() => router.push('/simulator')}
+          onStatistics={() => router.push('/stats')}
+          onHistory={() => router.push('/movements')}
+          onRegisterMovement={() => router.push(
+            ledger.accounts.length
+              ? { pathname: '/movements', params: { create: '1' } }
+              : '/accounts',
+          )}
+        />
 
         <View
           style={{
@@ -1004,26 +809,6 @@ export default function HomeTab() {
                 : "Añadir cuenta primero"}
             </Text>
           </Pressable>
-          <Pressable
-            onPress={() => router.push("/movements")}
-            accessibilityRole="button"
-            style={{
-              marginTop: 10,
-              minHeight: 48,
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Text
-              style={{
-                color: INK,
-                fontFamily: font.medium,
-                fontSize: 14,
-              }}
-            >
-              Ver historial y registrar movimiento realizado
-            </Text>
-          </Pressable>
         </View>
       </ScrollView>
 
@@ -1039,111 +824,6 @@ export default function HomeTab() {
         onSave={addMovement}
       />
 
-      <AppBottomSheet
-        visible={balanceModalVisible}
-        onClose={() => setBalanceModalVisible(false)}
-        snapPoints={["50%", "68%"]}
-      >
-        <View>
-          <Text
-            style={{
-              color: INK,
-              fontFamily: font.semibold,
-              fontSize: 21,
-            }}
-          >
-            Saldo disponible
-          </Text>
-          <Text
-            style={{
-              color: MUTED,
-              fontFamily: font.regular,
-              fontSize: 14,
-              marginTop: 8,
-              lineHeight: 21,
-            }}
-          >
-            Ingresa el dinero que tienes hoy en efectivo y cuentas de débito.
-          </Text>
-          <TextInput
-            autoFocus
-            keyboardType="decimal-pad"
-            placeholder="0.00"
-            placeholderTextColor="#b0b0b0"
-            value={balanceInput}
-            onChangeText={(value) => {
-              setBalanceInput(formatMoneyInput(value));
-              setInputError(false);
-            }}
-            style={{
-              borderBottomWidth: 1,
-              borderBottomColor: inputError ? "#c84242" : "#ddd",
-              color: INK,
-              fontFamily: font.medium,
-              fontSize: 34,
-              marginTop: 22,
-              paddingVertical: 10,
-            }}
-          />
-          {inputError && (
-            <Text
-              style={{
-                color: "#c84242",
-                fontFamily: font.regular,
-                marginTop: 6,
-              }}
-            >
-              Ingresa un importe válido con hasta dos decimales.
-            </Text>
-          )}
-          <View
-            style={{
-              flexDirection: "row",
-              gap: 12,
-              marginTop: 28,
-            }}
-          >
-            <Pressable
-              onPress={() => setBalanceModalVisible(false)}
-              style={{
-                flex: 1,
-                height: 48,
-                justifyContent: "center",
-                alignItems: "center",
-              }}
-            >
-              <Text
-                style={{
-                  fontFamily: font.medium,
-                  color: MUTED,
-                }}
-              >
-                Cancelar
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={saveBalance}
-              style={{
-                flex: 1,
-                height: 48,
-                borderRadius: 12,
-                backgroundColor: INK,
-                justifyContent: "center",
-                alignItems: "center",
-              }}
-            >
-              <Text
-                style={{
-                  fontFamily: font.medium,
-                  color: "#fff",
-                }}
-              >
-                Guardar
-              </Text>
-            </Pressable>
-          </View>
-        </View>
-      </AppBottomSheet>
     </SafeAreaView>
   );
 }

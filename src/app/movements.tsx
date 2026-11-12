@@ -1,6 +1,6 @@
 import { Feather } from '@expo/vector-icons'
 import { BottomSheetTextInput as TextInput } from '@gorhom/bottom-sheet'
-import { useRouter } from 'expo-router'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useState } from 'react'
 import { Alert, Pressable, ScrollView, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -25,10 +25,15 @@ const semibold = 'Inter_600SemiBold'
 
 export default function MovementsScreen() {
   const router = useRouter()
+  const { create } = useLocalSearchParams<{
+    create?: string
+  }>()
   const [ledger, setLedger] = useState(getLedger)
-  const [editing, setEditing] = useState<CompletedMovement | null | undefined>(undefined)
+  const [editing, setEditing] = useState<CompletedMovement | null | undefined>(
+    create === '1' ? null : undefined,
+  )
   const [type, setType] = useState<CompletedMovement['type']>('expense')
-  const [accountId, setAccountId] = useState('')
+  const [accountId, setAccountId] = useState(create === '1' ? (ledger.accounts[0]?.id ?? '') : '')
   const [counterpartyAccountId, setCounterpartyAccountId] = useState('')
   const [amount, setAmount] = useState('')
   const [date, setDate] = useState(localDateKey(new Date()))
