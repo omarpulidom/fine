@@ -38,6 +38,17 @@ export default function MovementsScreen() {
     ...ledger.completedMovements,
   ].sort((a, b) => b.effectiveDate.localeCompare(a.effectiveDate))
 
+  const movementTypes: CompletedMovement['type'][] =
+    editing?.type === 'transfer'
+      ? [
+          'expense',
+          'income',
+          'transfer',
+        ]
+      : [
+          'expense',
+          'income',
+        ]
   function open(movement: CompletedMovement | null) {
     setEditing(movement)
     setType(movement?.type ?? 'expense')
@@ -312,13 +323,7 @@ export default function MovementsScreen() {
               marginTop: 24,
             }}
           >
-            {(
-              [
-                'expense',
-                'income',
-                'transfer',
-              ] as const
-            ).map((value) => (
+            {movementTypes.map((value) => (
               <Pressable
                 key={value}
                 onPress={() => setType(value)}

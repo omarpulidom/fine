@@ -43,6 +43,17 @@ export function ScheduledMovementModal({
   const [endDateInput, setEndDateInput] = useState('')
   const [error, setError] = useState('')
 
+  const movementTypes: DraftMovement['type'][] =
+    initial?.type === 'transfer'
+      ? [
+          'expense',
+          'income',
+          'transfer',
+        ]
+      : [
+          'expense',
+          'income',
+        ]
   useEffect(() => {
     if (!visible) return
     setType(initial?.type ?? 'expense')
@@ -164,13 +175,7 @@ export function ScheduledMovementModal({
             marginTop: 26,
           }}
         >
-          {(
-            [
-              'expense',
-              'income',
-              'transfer',
-            ] as const
-          ).map((value) => (
+          {movementTypes.map((value) => (
             <Pressable
               key={value}
               onPress={() => setType(value)}
