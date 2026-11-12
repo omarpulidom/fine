@@ -1,6 +1,9 @@
 import { Feather } from '@expo/vector-icons'
-import { useMemo, useState } from 'react'
+import { useFocusEffect } from '@react-navigation/native'
+import { useRouter } from 'expo-router'
+import { useCallback, useMemo, useState } from 'react'
 import {
+  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -12,25 +15,36 @@ import {
   View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import Svg, { Circle, Line } from 'react-native-svg'
-import { getCurrentBalanceCents, setCurrentBalanceCents } from '@/features/finance/currentAccount'
+import Svg, { Circle, Line, Path } from 'react-native-svg'
+import { localDateKey } from '@/features/finance/dates'
+import { liquidityHistory } from '@/features/finance/history'
+import {
+  getLedger,
+  newAccountId,
+  newMovementId,
+  totalLiquidity,
+  upsertAccount,
+  upsertCompletedMovement,
+} from '@/features/finance/ledger'
+import { formatMoney, parseAmount } from '@/features/finance/money'
+import { projectLiquidity } from '@/features/finance/projection'
+import { ScheduledMovementModal } from '@/features/finance/ScheduledMovementModal'
+import {
+  deleteScheduledMovement,
+  getScheduledMovements,
+  nextOccurrenceDate,
+  type ScheduledMovement,
+  saveScheduledMovement,
+} from '@/features/finance/scheduledMovements'
 
 const BACKGROUND = '#f6f6f6'
 const INK = '#101010'
 const MUTED = '#898989'
-const HORIZON_DAYS = 30
 const font = {
   regular: 'Inter_400Regular',
   medium: 'Inter_500Medium',
   semibold: 'Inter_600SemiBold',
 } as const
-
-function formatMoney(cents: number): string {
-  return `$${new Intl.NumberFormat('es-MX', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(cents / 100)}`
-}
 
 function formatDay(date: Date): string {
   return new Intl.DateTimeFormat('es-MX', {
@@ -39,22 +53,98 @@ function formatDay(date: Date): string {
   }).format(date)
 }
 
-function parseAmount(raw: string): number | null {
-  const trimmed = raw.trim().replace(/\s/g, '')
-  if (!/^\d+([.,]\d{1,2})?$/.test(trimmed)) return null
-  const cents = Math.round(Number(trimmed.replace(',', '.')) * 100)
-  return Number.isSafeInteger(cents) ? cents : null
-}
-
 export default function HomeTab() {
+  const router = useRouter()
   const { width: screenWidth } = useWindowDimensions()
   const chartWidth = screenWidth - 48
-  const [balanceCents, setBalanceCents] = useState<number | null>(getCurrentBalanceCents)
+  const [ledger, setLedger] = useState(getLedger)
+  const balanceCents = ledger.accounts.length ? totalLiquidity(ledger) : null
+  const [movements, setMovements] = useState<ScheduledMovement[]>(getScheduledMovements)
+  const [movementModalVisible, setMovementModalVisible] = useState(false)
+  const [editingScheduled, setEditingScheduled] = useState<ScheduledMovement | null>(null)
   const [selectedDay, setSelectedDay] = useState(0)
+  const [horizonDays, setHorizonDays] = useState<7 | 30 | 60 | 90>(30)
   const [balanceModalVisible, setBalanceModalVisible] = useState(false)
   const [balanceInput, setBalanceInput] = useState('')
   const [inputError, setInputError] = useState(false)
-  const today = useMemo(() => new Date(), [])
+  const [today, setToday] = useState(() => new Date())
+  useFocusEffect(
+    useCallback(() => {
+      setToday(new Date())
+      setLedger(getLedger())
+      setSelectedDay(0)
+    }, []),
+  )
+  const todayKey = localDateKey(today)
+  const completedOccurrences = useMemo(
+    () =>
+      new Set(
+        ledger.completedMovements
+          .filter((item) => item.sourceScheduledId && item.sourceOccurrenceDate)
+          .map((item) => `${item.sourceScheduledId}:${item.sourceOccurrenceDate}`),
+      ),
+    [
+      ledger.completedMovements,
+    ],
+  )
+  const cardPayments = useMemo(
+    () =>
+      ledger.cycles.flatMap((cycle) =>
+        cycle.scheduledDate && cycle.scheduledAmountCents > cycle.paidAmountCents
+          ? [
+              {
+                date: cycle.scheduledDate,
+                amountCents: cycle.scheduledAmountCents - cycle.paidAmountCents,
+              },
+            ]
+          : [],
+      ),
+    [
+      ledger.cycles,
+    ],
+  )
+  const projection = useMemo(
+    () =>
+      balanceCents === null
+        ? []
+        : projectLiquidity(
+            balanceCents,
+            todayKey,
+            movements,
+            horizonDays,
+            cardPayments,
+            completedOccurrences,
+          ),
+    [
+      balanceCents,
+      todayKey,
+      movements,
+      horizonDays,
+      cardPayments,
+      completedOccurrences,
+    ],
+  )
+  const history = useMemo(
+    () => liquidityHistory(ledger, todayKey),
+    [
+      ledger,
+      todayKey,
+    ],
+  )
+  const sortedMovements = useMemo(
+    () =>
+      [
+        ...movements.filter((movement) => nextOccurrenceDate(movement, completedOccurrences)),
+      ].sort((a, b) =>
+        (nextOccurrenceDate(a, completedOccurrences) ?? a.effectiveDate).localeCompare(
+          nextOccurrenceDate(b, completedOccurrences) ?? b.effectiveDate,
+        ),
+      ),
+    [
+      movements,
+      completedOccurrences,
+    ],
+  )
   const selectedDate = new Date(
     today.getFullYear(),
     today.getMonth(),
@@ -62,17 +152,54 @@ export default function HomeTab() {
   )
 
   const chartPadding = 12
-  const selectedX = chartPadding + (selectedDay / HORIZON_DAYS) * (chartWidth - chartPadding * 2)
-  const lineY = 126
+  const todayX = chartPadding + (chartWidth - chartPadding * 2) * 0.56
+  const historyDays = history.length - 1
+  const selectedX =
+    selectedDay < 0 && historyDays > 0
+      ? todayX + (selectedDay / historyDays) * (todayX - chartPadding)
+      : todayX + (selectedDay / horizonDays) * (chartWidth - chartPadding - todayX)
   const baselineY = 216
+  const balances = [
+    ...history,
+    ...projection,
+  ].map((point) => point.balanceCents)
+  const minimumBalance = balances.length ? Math.min(...balances) : 0
+  const maximumBalance = balances.length ? Math.max(...balances) : 0
+  const range = maximumBalance - minimumBalance
+  const yForBalance = (value: number) =>
+    range === 0 ? 126 : 183 - ((value - minimumBalance) / range) * 138
+  const selectedBalance =
+    selectedDay < 0
+      ? (history[historyDays + selectedDay]?.balanceCents ?? null)
+      : (projection[selectedDay]?.balanceCents ?? null)
+  const historyPath = history
+    .map((point, index) => {
+      const x =
+        historyDays === 0 ? todayX : chartPadding + (index / historyDays) * (todayX - chartPadding)
+      const y = yForBalance(point.balanceCents)
+      return index === 0 ? `M ${x} ${y}` : `H ${x} V ${y}`
+    })
+    .join(' ')
+  const chartPath = projection
+    .map((point, index) => {
+      const x = todayX + (index / horizonDays) * (chartWidth - chartPadding - todayX)
+      const y = yForBalance(point.balanceCents)
+      return index === 0 ? `M ${x} ${y}` : `H ${x} V ${y}`
+    })
+    .join(' ')
 
   function selectAt(x: number) {
-    const ratio = (x - chartPadding) / (chartWidth - chartPadding * 2)
-    setSelectedDay(Math.max(0, Math.min(HORIZON_DAYS, Math.round(ratio * HORIZON_DAYS))))
+    if (x < todayX && historyDays > 0) {
+      const offset = Math.round(((x - todayX) / (todayX - chartPadding)) * historyDays)
+      setSelectedDay(Math.max(-historyDays, Math.min(0, offset)))
+    } else {
+      const ratio = (x - todayX) / (chartWidth - chartPadding - todayX)
+      setSelectedDay(Math.max(0, Math.min(horizonDays, Math.round(ratio * horizonDays))))
+    }
   }
 
   function openBalanceModal() {
-    setBalanceInput(balanceCents === null ? '' : (balanceCents / 100).toFixed(2))
+    setBalanceInput('')
     setInputError(false)
     setBalanceModalVisible(true)
   }
@@ -83,9 +210,82 @@ export default function HomeTab() {
       setInputError(true)
       return
     }
-    setCurrentBalanceCents(cents)
-    setBalanceCents(cents)
+    setLedger(
+      upsertAccount({
+        id: newAccountId(),
+        name: 'Cuenta principal',
+        type: 'bank',
+        balanceCents: cents,
+        asOfDate: todayKey,
+      }),
+    )
     setBalanceModalVisible(false)
+  }
+
+  function addMovement(draft: Omit<ScheduledMovement, 'id'>) {
+    setMovements(
+      saveScheduledMovement({
+        ...draft,
+        id:
+          editingScheduled?.id ??
+          `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`,
+      }),
+    )
+  }
+
+  function confirmDeleteMovement(movement: ScheduledMovement) {
+    Alert.alert('Eliminar movimiento', 'Este movimiento dejará de afectar la proyección.', [
+      {
+        text: 'Cancelar',
+        style: 'cancel',
+      },
+      {
+        text: 'Eliminar',
+        style: 'destructive',
+        onPress: () => setMovements(deleteScheduledMovement(movement.id)),
+      },
+    ])
+  }
+
+  function confirmCompleteMovement(movement: ScheduledMovement) {
+    const occurrenceDate = nextOccurrenceDate(movement, completedOccurrences)
+    const accountId = movement.accountId ?? ledger.accounts[0]?.id
+    if (!occurrenceDate || !accountId) return
+    Alert.alert(
+      'Registrar como realizado',
+      'Se aplicará al saldo actual y dejará de proyectarse.',
+      [
+        {
+          text: 'Cancelar',
+          style: 'cancel',
+        },
+        {
+          text: 'Registrar',
+          onPress: () => {
+            try {
+              setLedger(
+                upsertCompletedMovement(
+                  {
+                    id: newMovementId(),
+                    type: movement.type,
+                    accountId,
+                    counterpartyAccountId: movement.counterpartyAccountId,
+                    amountCents: movement.amountCents,
+                    effectiveDate: todayKey,
+                    description: movement.description,
+                    sourceScheduledId: movement.id,
+                    sourceOccurrenceDate: occurrenceDate,
+                  },
+                  todayKey,
+                ),
+              )
+            } catch (caught) {
+              Alert.alert('No se pudo registrar', caught instanceof Error ? caught.message : '')
+            }
+          },
+        },
+      ],
+    )
   }
 
   return (
@@ -131,7 +331,7 @@ export default function HomeTab() {
           </Text>
           <Text
             accessibilityLabel={
-              balanceCents === null ? 'Saldo sin registrar' : formatMoney(balanceCents)
+              selectedBalance === null ? 'Saldo sin registrar' : formatMoney(selectedBalance)
             }
             style={{
               color: INK,
@@ -141,7 +341,7 @@ export default function HomeTab() {
               marginTop: 7,
             }}
           >
-            {balanceCents === null ? '—' : formatMoney(balanceCents)}
+            {selectedBalance === null ? '—' : formatMoney(selectedBalance)}
           </Text>
           <Text
             style={{
@@ -156,12 +356,14 @@ export default function HomeTab() {
               ? 'Registra tu saldo disponible'
               : selectedDay === 0
                 ? 'Saldo disponible actual'
-                : 'Sin cambios programados hasta esta fecha'}
+                : selectedDay < 0
+                  ? 'Saldo histórico'
+                  : 'Saldo proyectado'}
           </Text>
         </View>
 
         <View
-          accessibilityLabel='Gráfica de liquidez de los próximos 30 días. Desliza para seleccionar una fecha.'
+          accessibilityLabel={`Gráfica de liquidez de los próximos ${horizonDays} días. Desliza para seleccionar una fecha.`}
           style={{
             marginTop: 48,
             height: 258,
@@ -184,14 +386,21 @@ export default function HomeTab() {
             />
             {balanceCents !== null && (
               <>
-                <Line
-                  x1={chartPadding}
-                  x2={chartWidth - chartPadding}
-                  y1={lineY}
-                  y2={lineY}
+                <Path
+                  d={historyPath}
+                  stroke={INK}
+                  strokeWidth={3.5}
+                  strokeLinecap='round'
+                  strokeLinejoin='round'
+                  fill='none'
+                />
+                <Path
+                  d={chartPath}
                   stroke='#d4d4d4'
                   strokeWidth={3.5}
                   strokeLinecap='round'
+                  strokeLinejoin='round'
+                  fill='none'
                 />
                 <Line
                   x1={selectedX}
@@ -202,7 +411,7 @@ export default function HomeTab() {
                   strokeWidth={1}
                   strokeDasharray='2 5'
                 />
-                <Circle cx={selectedX} cy={lineY} r={5} fill={INK} />
+                <Circle cx={selectedX} cy={yForBalance(selectedBalance ?? 0)} r={5} fill={INK} />
               </>
             )}
           </Svg>
@@ -220,6 +429,15 @@ export default function HomeTab() {
                 fontSize: 12,
               }}
             >
+              Historial
+            </Text>
+            <Text
+              style={{
+                color: MUTED,
+                fontFamily: font.regular,
+                fontSize: 12,
+              }}
+            >
               Hoy
             </Text>
             <Text
@@ -229,9 +447,51 @@ export default function HomeTab() {
                 fontSize: 12,
               }}
             >
-              30 días
+              {horizonDays} días
             </Text>
           </View>
+        </View>
+
+        <View
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'center',
+            gap: 7,
+            marginTop: 4,
+          }}
+        >
+          {(
+            [
+              7,
+              30,
+              60,
+              90,
+            ] as const
+          ).map((days) => (
+            <Pressable
+              key={days}
+              onPress={() => {
+                setHorizonDays(days)
+                setSelectedDay((current) => Math.min(current, days))
+              }}
+              style={{
+                paddingHorizontal: 14,
+                paddingVertical: 8,
+                borderRadius: 9,
+                backgroundColor: horizonDays === days ? '#e3e3e3' : 'transparent',
+              }}
+            >
+              <Text
+                style={{
+                  color: horizonDays === days ? INK : MUTED,
+                  fontFamily: font.medium,
+                  fontSize: 12,
+                }}
+              >
+                {days} días
+              </Text>
+            </Pressable>
+          ))}
         </View>
 
         <View
@@ -266,7 +526,7 @@ export default function HomeTab() {
             </Text>
           </View>
           <Pressable
-            onPress={openBalanceModal}
+            onPress={() => (balanceCents === null ? openBalanceModal() : router.push('/accounts'))}
             style={{
               marginTop: 9,
               height: 56,
@@ -277,7 +537,7 @@ export default function HomeTab() {
               paddingHorizontal: 18,
             }}
             accessibilityRole='button'
-            accessibilityLabel={balanceCents === null ? 'Registrar saldo' : 'Editar saldo'}
+            accessibilityLabel={balanceCents === null ? 'Registrar saldo' : 'Administrar cuentas'}
           >
             <View
               style={{
@@ -290,7 +550,7 @@ export default function HomeTab() {
                 marginRight: 14,
               }}
             >
-              <Feather name='credit-card' size={14} color={INK} />
+              <Feather name='dollar-sign' size={14} color={INK} />
             </View>
             <Text
               style={{
@@ -300,9 +560,46 @@ export default function HomeTab() {
                 fontSize: 15,
               }}
             >
-              Efectivo y débito
+              {balanceCents === null ? 'Registrar cuenta principal' : 'Administrar cuentas'}
             </Text>
-            <Feather name={balanceCents === null ? 'plus' : 'edit-2'} size={17} color={MUTED} />
+            <Feather
+              name={balanceCents === null ? 'plus' : 'arrow-right'}
+              size={17}
+              color={MUTED}
+            />
+          </Pressable>
+          <Pressable
+            onPress={() => router.push('/cards')}
+            accessibilityRole='button'
+            style={{
+              marginTop: 9,
+              height: 56,
+              borderRadius: 12,
+              backgroundColor: '#fff',
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingHorizontal: 18,
+            }}
+          >
+            <Feather
+              name='credit-card'
+              size={17}
+              color={INK}
+              style={{
+                marginRight: 18,
+              }}
+            />
+            <Text
+              style={{
+                flex: 1,
+                color: INK,
+                fontFamily: font.medium,
+                fontSize: 15,
+              }}
+            >
+              Tarjetas de crédito
+            </Text>
+            <Feather name='arrow-right' size={17} color={MUTED} />
           </Pressable>
         </View>
 
@@ -318,32 +615,238 @@ export default function HomeTab() {
               fontSize: 14,
             }}
           >
-            Próximos movimientos
+            Movimientos programados
           </Text>
-          <View
+          {sortedMovements.length === 0 && cardPayments.length === 0 ? (
+            <View
+              style={{
+                marginTop: 9,
+                minHeight: 74,
+                borderRadius: 12,
+                backgroundColor: '#fff',
+                alignItems: 'center',
+                justifyContent: 'center',
+                paddingHorizontal: 20,
+              }}
+            >
+              <Text
+                style={{
+                  color: MUTED,
+                  fontFamily: font.regular,
+                  fontSize: 14,
+                  textAlign: 'center',
+                }}
+              >
+                Aún no hay movimientos programados
+              </Text>
+            </View>
+          ) : (
+            sortedMovements.map((movement) => (
+              <View
+                key={movement.id}
+                style={{
+                  marginTop: 9,
+                  minHeight: 64,
+                  borderRadius: 12,
+                  backgroundColor: '#fff',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingHorizontal: 16,
+                }}
+              >
+                <Pressable
+                  onPress={() => {
+                    setEditingScheduled(movement)
+                    setMovementModalVisible(true)
+                  }}
+                  style={{
+                    flex: 1,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: INK,
+                      fontFamily: font.medium,
+                      fontSize: 14,
+                    }}
+                  >
+                    {movement.description ||
+                      (movement.type === 'income'
+                        ? 'Ingreso'
+                        : movement.type === 'transfer'
+                          ? 'Transferencia'
+                          : 'Gasto')}
+                  </Text>
+                  <Text
+                    style={{
+                      color: MUTED,
+                      fontFamily: font.regular,
+                      fontSize: 12,
+                      marginTop: 3,
+                    }}
+                  >
+                    {movement.recurrence
+                      ? `${movement.recurrence === 'weekly' ? 'Semanal' : movement.recurrence === 'biweekly' ? 'Quincenal' : 'Mensual'} · ${nextOccurrenceDate(movement, completedOccurrences) ?? 'Finalizada'}`
+                      : `${movement.effectiveDate < todayKey ? 'Pendiente desde ' : ''}${movement.effectiveDate}`}
+                    {movement.accountId
+                      ? ` · ${ledger.accounts.find((account) => account.id === movement.accountId)?.name ?? 'Cuenta'}`
+                      : ''}
+                  </Text>
+                </Pressable>
+                <Text
+                  style={{
+                    color: INK,
+                    fontFamily: font.medium,
+                    fontSize: 14,
+                    marginRight: 14,
+                  }}
+                >
+                  {movement.type === 'income' ? '+' : movement.type === 'transfer' ? '↔ ' : '−'}
+                  {formatMoney(movement.amountCents)}
+                </Text>
+                <Pressable
+                  onPress={() => confirmCompleteMovement(movement)}
+                  accessibilityRole='button'
+                  accessibilityLabel='Registrar movimiento como realizado'
+                  hitSlop={8}
+                  style={{
+                    marginRight: 14,
+                  }}
+                >
+                  <Feather name='check-circle' size={17} color={MUTED} />
+                </Pressable>
+                <Pressable
+                  onPress={() => confirmDeleteMovement(movement)}
+                  accessibilityRole='button'
+                  accessibilityLabel='Eliminar movimiento'
+                  hitSlop={10}
+                >
+                  <Feather name='trash-2' size={16} color={MUTED} />
+                </Pressable>
+              </View>
+            ))
+          )}
+          {ledger.cycles
+            .filter(
+              (cycle) => cycle.scheduledDate && cycle.scheduledAmountCents > cycle.paidAmountCents,
+            )
+            .map((cycle) => (
+              <Pressable
+                key={cycle.id}
+                onPress={() => router.push('/cards')}
+                style={{
+                  marginTop: 9,
+                  minHeight: 64,
+                  borderRadius: 12,
+                  backgroundColor: '#fff',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingHorizontal: 16,
+                }}
+              >
+                <View
+                  style={{
+                    flex: 1,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: INK,
+                      fontFamily: font.medium,
+                      fontSize: 14,
+                    }}
+                  >
+                    Pago de{' '}
+                    {ledger.cards.find((card) => card.id === cycle.cardId)?.name ?? 'tarjeta'}
+                  </Text>
+                  <Text
+                    style={{
+                      color: MUTED,
+                      fontFamily: font.regular,
+                      fontSize: 12,
+                      marginTop: 3,
+                    }}
+                  >
+                    {cycle.scheduledDate}
+                  </Text>
+                </View>
+                <Text
+                  style={{
+                    color: INK,
+                    fontFamily: font.medium,
+                    fontSize: 14,
+                  }}
+                >
+                  −{formatMoney(cycle.scheduledAmountCents - cycle.paidAmountCents)}
+                </Text>
+              </Pressable>
+            ))}
+          <Pressable
+            onPress={() => {
+              if (!ledger.accounts.length) {
+                router.push('/accounts')
+                return
+              }
+              setEditingScheduled(null)
+              setMovementModalVisible(true)
+            }}
+            accessibilityRole='button'
             style={{
-              marginTop: 9,
-              minHeight: 74,
+              marginTop: 16,
+              minHeight: 52,
               borderRadius: 12,
-              backgroundColor: '#fff',
+              backgroundColor: INK,
+              flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'center',
-              paddingHorizontal: 20,
+              gap: 8,
+            }}
+          >
+            <Feather name='plus' size={18} color='#fff' />
+            <Text
+              style={{
+                color: '#fff',
+                fontFamily: font.medium,
+                fontSize: 14,
+              }}
+            >
+              {ledger.accounts.length ? 'Programar movimiento' : 'Añadir cuenta primero'}
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => router.push('/movements')}
+            accessibilityRole='button'
+            style={{
+              marginTop: 10,
+              minHeight: 48,
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
           >
             <Text
               style={{
-                color: MUTED,
-                fontFamily: font.regular,
+                color: INK,
+                fontFamily: font.medium,
                 fontSize: 14,
-                textAlign: 'center',
               }}
             >
-              Aún no hay movimientos programados
+              Ver historial y registrar movimiento realizado
             </Text>
-          </View>
+          </Pressable>
         </View>
       </ScrollView>
+
+      <ScheduledMovementModal
+        visible={movementModalVisible}
+        todayKey={todayKey}
+        accounts={ledger.accounts}
+        initial={editingScheduled}
+        onClose={() => {
+          setMovementModalVisible(false)
+          setEditingScheduled(null)
+        }}
+        onSave={addMovement}
+      />
 
       <Modal
         visible={balanceModalVisible}
