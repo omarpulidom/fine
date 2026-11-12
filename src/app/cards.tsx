@@ -24,7 +24,7 @@ import {
   statementAmountCents,
   updateCreditCardSettings,
 } from '@/features/finance/ledger'
-import { formatMoney, parseAmount } from '@/features/finance/money'
+import { formatMoney, formatMoneyInput, parseAmount } from '@/features/finance/money'
 
 const INK = '#101010'
 const MUTED = '#888'
@@ -63,7 +63,7 @@ function Field({
   return (
     <TextInput
       value={value}
-      onChangeText={onChangeText}
+      onChangeText={(value) => onChangeText(decimal ? formatMoneyInput(value) : value)}
       placeholder={placeholder}
       placeholderTextColor='#bbb'
       keyboardType={decimal ? 'decimal-pad' : 'default'}
@@ -156,17 +156,21 @@ export default function CardsScreen() {
     }
     if (nextMode === 'plan') {
       const cycle = ledger.cycles.find((item) => item.id === cycleId)
-      setAmount(cycle?.scheduledAmountCents ? (cycle.scheduledAmountCents / 100).toFixed(2) : '')
+      setAmount(
+        cycle?.scheduledAmountCents
+          ? formatMoneyInput((cycle.scheduledAmountCents / 100).toFixed(2))
+          : '',
+      )
       setDueDate(cycle?.dueDate ?? '')
       setPaymentToAvoidInterest(
         cycle?.paymentToAvoidInterestCents === undefined
           ? ''
-          : (cycle.paymentToAvoidInterestCents / 100).toFixed(2),
+          : formatMoneyInput((cycle.paymentToAvoidInterestCents / 100).toFixed(2)),
       )
       setMinimumPayment(
         cycle?.minimumPaymentCents === undefined
           ? ''
-          : (cycle.minimumPaymentCents / 100).toFixed(2),
+          : formatMoneyInput((cycle.minimumPaymentCents / 100).toFixed(2)),
       )
     }
   }

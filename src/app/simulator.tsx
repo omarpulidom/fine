@@ -10,7 +10,7 @@ import { AppBottomSheet } from '@/components/ui/AppBottomSheet'
 import { addDaysKey, localDateKey } from '@/features/finance/dates'
 import { allocateInstallments } from '@/features/finance/installments'
 import { getLedger, totalLiquidity } from '@/features/finance/ledger'
-import { formatMoney, parseAmount } from '@/features/finance/money'
+import { formatMoney, formatMoneyInput, parseAmount } from '@/features/finance/money'
 import { projectLiquidity } from '@/features/finance/projection'
 import { getScheduledMovements } from '@/features/finance/scheduledMovements'
 import { type PurchaseScenario, simulatePurchase } from '@/features/finance/simulation'
@@ -212,7 +212,7 @@ export default function SimulatorScreen() {
       </Text>
       <BottomSheetTextInput
         value={value}
-        onChangeText={change}
+        onChangeText={(value) => change(decimal ? formatMoneyInput(value) : value)}
         placeholder={placeholder}
         keyboardType={decimal ? 'decimal-pad' : 'default'}
         style={{

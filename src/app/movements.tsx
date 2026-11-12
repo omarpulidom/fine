@@ -13,7 +13,7 @@ import {
   newMovementId,
   upsertCompletedMovement,
 } from '@/features/finance/ledger'
-import { formatMoney, parseAmount } from '@/features/finance/money'
+import { formatMoney, formatMoneyInput, parseAmount } from '@/features/finance/money'
 
 const INK = '#101010'
 const MUTED = '#888'
@@ -54,7 +54,7 @@ export default function MovementsScreen() {
     setType(movement?.type ?? 'expense')
     setAccountId(movement?.accountId ?? ledger.accounts[0]?.id ?? '')
     setCounterpartyAccountId(movement?.counterpartyAccountId ?? ledger.accounts[1]?.id ?? '')
-    setAmount(movement ? (movement.amountCents / 100).toFixed(2) : '')
+    setAmount(movement ? formatMoneyInput((movement.amountCents / 100).toFixed(2)) : '')
     setDate(movement?.effectiveDate ?? todayKey)
     setDescription(movement?.description ?? '')
     setError('')
@@ -358,7 +358,7 @@ export default function MovementsScreen() {
           </Text>
           <TextInput
             value={amount}
-            onChangeText={setAmount}
+            onChangeText={(value) => setAmount(formatMoneyInput(value))}
             keyboardType='decimal-pad'
             placeholder='0.00'
             placeholderTextColor='#bbb'

@@ -12,7 +12,7 @@ import {
   newAccountId,
   upsertAccount,
 } from '@/features/finance/ledger'
-import { formatMoney, parseAmount } from '@/features/finance/money'
+import { formatMoney, formatMoneyInput, parseAmount } from '@/features/finance/money'
 
 const INK = '#101010'
 const MUTED = '#888'
@@ -34,7 +34,7 @@ export default function AccountsScreen() {
     setEditing(account)
     setName(account?.name ?? '')
     setType(account?.type ?? 'bank')
-    setBalance(account ? (account.balanceCents / 100).toFixed(2) : '')
+    setBalance(account ? formatMoneyInput((account.balanceCents / 100).toFixed(2)) : '')
     setError('')
   }
 
@@ -277,7 +277,7 @@ export default function AccountsScreen() {
           </Text>
           <TextInput
             value={balance}
-            onChangeText={setBalance}
+            onChangeText={(value) => setBalance(formatMoneyInput(value))}
             keyboardType='decimal-pad'
             placeholder='0.00'
             placeholderTextColor='#bbb'

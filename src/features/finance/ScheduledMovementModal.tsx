@@ -4,7 +4,7 @@ import { Pressable, ScrollView, Text, View } from 'react-native'
 import { AppBottomSheet } from '@/components/ui/AppBottomSheet'
 import { addDaysKey, isDateKey } from './dates'
 import type { LiquidAccount } from './ledger'
-import { parseAmount } from './money'
+import { formatMoneyInput, parseAmount } from './money'
 import type { ScheduledMovement } from './scheduledMovements'
 
 type DraftMovement = Omit<ScheduledMovement, 'id'>
@@ -57,7 +57,7 @@ export function ScheduledMovementModal({
   useEffect(() => {
     if (!visible) return
     setType(initial?.type ?? 'expense')
-    setAmount(initial ? (initial.amountCents / 100).toFixed(2) : '')
+    setAmount(initial ? formatMoneyInput((initial.amountCents / 100).toFixed(2)) : '')
     setDescription(initial?.description ?? '')
     setAccountId(initial?.accountId ?? accounts[0]?.id ?? '')
     setCounterpartyAccountId(initial?.counterpartyAccountId ?? '')
@@ -214,7 +214,7 @@ export function ScheduledMovementModal({
           keyboardType='decimal-pad'
           value={amount}
           onChangeText={(value) => {
-            setAmount(value)
+            setAmount(formatMoneyInput(value))
             setError('')
           }}
           placeholder='0.00'

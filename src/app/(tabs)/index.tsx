@@ -17,7 +17,7 @@ import {
   upsertAccount,
   upsertCompletedMovement,
 } from '@/features/finance/ledger'
-import { formatMoney, parseAmount } from '@/features/finance/money'
+import { formatMoney, formatMoneyInput, parseAmount } from '@/features/finance/money'
 import { projectLiquidityBreakdown } from '@/features/finance/projection'
 import { ScheduledMovementModal } from '@/features/finance/ScheduledMovementModal'
 import {
@@ -1034,7 +1034,7 @@ export default function HomeTab() {
             placeholderTextColor='#b0b0b0'
             value={balanceInput}
             onChangeText={(value) => {
-              setBalanceInput(value)
+              setBalanceInput(formatMoneyInput(value))
               setInputError(false)
             }}
             style={{
