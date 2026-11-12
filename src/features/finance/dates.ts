@@ -5,6 +5,22 @@ export function localDateKey(date: Date): string {
   return `${year}-${month}-${day}`
 }
 
+export function formatDateDisplay(
+  date: Date,
+  includeYear = true,
+  monthStyle: 'long' | 'short' = 'long',
+): string {
+  const parts = new Intl.DateTimeFormat('es-MX', {
+    day: 'numeric',
+    month: monthStyle,
+    year: 'numeric',
+  }).formatToParts(date)
+  const get = (type: 'day' | 'month' | 'year') =>
+    parts.find((part) => part.type === type)?.value ?? ''
+  const month = get('month')
+  return `${get('day')} ${month.charAt(0).toUpperCase()}${month.slice(1)}${includeYear ? ` ${get('year')}` : ''}`
+}
+
 export function isDateKey(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
   const date = new Date(`${value}T12:00:00Z`)

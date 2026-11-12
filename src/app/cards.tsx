@@ -6,7 +6,8 @@ import { useCallback, useState } from 'react'
 import { Alert, Pressable, ScrollView, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { AppBottomSheet } from '@/components/ui/AppBottomSheet'
-import { isDateKey, localDateKey } from '@/features/finance/dates'
+import { DateField } from '@/components/ui/DateField'
+import { addDaysKey, isDateKey, localDateKey } from '@/features/finance/dates'
 import { allocateInstallments } from '@/features/finance/installments'
 import {
   addCardActivity,
@@ -753,10 +754,18 @@ export default function CardsScreen() {
               >
                 La diferencia es deuda aún no facturada.
               </Text>
-              <Label>Último corte (AAAA-MM-DD), si hay saldo facturado</Label>
-              <Field value={cutoffDate} onChangeText={setCutoffDate} placeholder='AAAA-MM-DD' />
-              <Label>Fecha límite (AAAA-MM-DD)</Label>
-              <Field value={dueDate} onChangeText={setDueDate} placeholder='AAAA-MM-DD' />
+              <DateField
+                label='Último corte, si hay saldo facturado'
+                value={cutoffDate}
+                onChange={setCutoffDate}
+                maximumDate={todayKey}
+              />
+              <DateField
+                label='Fecha límite'
+                value={dueDate}
+                onChange={setDueDate}
+                minimumDate={cutoffDate ? addDaysKey(cutoffDate, 1) : undefined}
+              />
             </>
           )}
           {mode === 'settings' && (
@@ -769,10 +778,13 @@ export default function CardsScreen() {
           )}
           {mode === 'cycle' && (
             <>
-              <Label>Fecha de corte (AAAA-MM-DD)</Label>
-              <Field value={cutoffDate} onChangeText={setCutoffDate} placeholder='AAAA-MM-DD' />
-              <Label>Fecha límite de pago (AAAA-MM-DD)</Label>
-              <Field value={dueDate} onChangeText={setDueDate} placeholder='AAAA-MM-DD' />
+              <DateField label='Fecha de corte' value={cutoffDate} onChange={setCutoffDate} />
+              <DateField
+                label='Fecha límite de pago'
+                value={dueDate}
+                onChange={setDueDate}
+                minimumDate={cutoffDate ? addDaysKey(cutoffDate, 1) : undefined}
+              />
               <Label>Deuda previa que se factura en este ciclo (opcional)</Label>
               <Field value={billed} onChangeText={setBilled} placeholder='0.00' decimal />
               <Text
@@ -907,8 +919,13 @@ export default function CardsScreen() {
                   </View>
                 </>
               )}
-              <Label>Fecha realizada (AAAA-MM-DD)</Label>
-              <Field value={activityDate} onChangeText={setActivityDate} placeholder='AAAA-MM-DD' />
+              <DateField
+                label='Fecha realizada'
+                value={activityDate}
+                onChange={setActivityDate}
+                minimumDate={selectedCard?.createdDate}
+                maximumDate={todayKey}
+              />
               <Label>Concepto (opcional)</Label>
               <Field
                 value={description}
@@ -954,15 +971,22 @@ export default function CardsScreen() {
                 {formatMoney(statementAmountCents(ledger, selectedCycleId))} · Ya pagado{' '}
                 {formatMoney(selectedCycle?.paidAmountCents ?? 0)}
               </Text>
-              <Label>Fecha límite confirmada (AAAA-MM-DD)</Label>
-              <Field value={dueDate} onChangeText={setDueDate} placeholder='AAAA-MM-DD' />
+              <DateField
+                label='Fecha límite confirmada'
+                value={dueDate}
+                onChange={setDueDate}
+                minimumDate={
+                  selectedCycle?.cutoffDate ? addDaysKey(selectedCycle.cutoffDate, 1) : undefined
+                }
+              />
               <Label>Monto total previsto (0 para quitar)</Label>
               <Field value={amount} onChangeText={setAmount} placeholder='0.00' decimal />
-              <Label>Fecha prevista (AAAA-MM-DD)</Label>
-              <Field
+              <DateField
+                label='Fecha prevista'
                 value={scheduledDate}
-                onChangeText={setScheduledDate}
-                placeholder='AAAA-MM-DD'
+                onChange={setScheduledDate}
+                minimumDate={addDaysKey(todayKey, 1)}
+                clearable
               />
               <Label>Pago para no generar intereses (informativo)</Label>
               <Field

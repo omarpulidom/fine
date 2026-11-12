@@ -7,6 +7,7 @@ import { Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-na
 import { SafeAreaView } from 'react-native-safe-area-context'
 import Svg, { Line, Path } from 'react-native-svg'
 import { AppBottomSheet } from '@/components/ui/AppBottomSheet'
+import { DateField } from '@/components/ui/DateField'
 import { addDaysKey, localDateKey } from '@/features/finance/dates'
 import { allocateInstallments } from '@/features/finance/installments'
 import { getLedger, totalLiquidity } from '@/features/finance/ledger'
@@ -482,7 +483,13 @@ export default function SimulatorScreen() {
           Compra hipotética
         </Text>
         {field('Importe', amount, setAmount, '0.00', true)}
-        {field('Fecha de compra (AAAA-MM-DD)', purchaseDate, setPurchaseDate, 'AAAA-MM-DD')}
+        <DateField
+          label='Fecha de compra'
+          value={purchaseDate}
+          onChange={setPurchaseDate}
+          minimumDate={todayKey}
+          maximumDate={addDaysKey(todayKey, 90)}
+        />
         <Text
           style={{
             fontFamily: medium,
@@ -544,7 +551,13 @@ export default function SimulatorScreen() {
               El pago es opcional. Solo un pago con fecha e importe explícitos reduce la liquidez.
             </Text>
             {field('Pago hipotético (opcional)', paymentAmount, setPaymentAmount, '0.00', true)}
-            {field('Fecha del pago (AAAA-MM-DD)', paymentDate, setPaymentDate, 'AAAA-MM-DD')}
+            <DateField
+              label='Fecha del pago hipotético'
+              value={paymentDate}
+              onChange={setPaymentDate}
+              minimumDate={purchaseDate}
+              clearable
+            />
           </>
         )}
         {method === 'msi' && (

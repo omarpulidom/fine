@@ -7,7 +7,7 @@ import { Alert, Pressable, ScrollView, Text, useWindowDimensions, View } from 'r
 import { SafeAreaView } from 'react-native-safe-area-context'
 import Svg, { Circle, Line, Path } from 'react-native-svg'
 import { AppBottomSheet } from '@/components/ui/AppBottomSheet'
-import { localDateKey } from '@/features/finance/dates'
+import { formatDateDisplay, localDateKey } from '@/features/finance/dates'
 import { liquidityHistory } from '@/features/finance/history'
 import {
   getLedger,
@@ -38,10 +38,7 @@ const font = {
 } as const
 
 function formatDay(date: Date): string {
-  return new Intl.DateTimeFormat('es-MX', {
-    day: 'numeric',
-    month: 'long',
-  }).format(date)
+  return formatDateDisplay(date, false)
 }
 
 export default function HomeTab() {

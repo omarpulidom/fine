@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { Alert, Pressable, ScrollView, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { AppBottomSheet } from '@/components/ui/AppBottomSheet'
+import { DateField } from '@/components/ui/DateField'
 import { isDateKey, localDateKey } from '@/features/finance/dates'
 import {
   type CompletedMovement,
@@ -37,7 +38,6 @@ export default function MovementsScreen() {
   const sorted = [
     ...ledger.completedMovements,
   ].sort((a, b) => b.effectiveDate.localeCompare(a.effectiveDate))
-
   const movementTypes: CompletedMovement['type'][] =
     editing?.type === 'transfer'
       ? [
@@ -49,6 +49,7 @@ export default function MovementsScreen() {
           'expense',
           'income',
         ]
+
   function open(movement: CompletedMovement | null) {
     setEditing(movement)
     setType(movement?.type ?? 'expense')
@@ -457,28 +458,11 @@ export default function MovementsScreen() {
               </ScrollView>
             </>
           )}
-          <Text
-            style={{
-              marginTop: 22,
-              fontFamily: medium,
-              fontSize: 13,
-              color: MUTED,
-            }}
-          >
-            Fecha (AAAA-MM-DD)
-          </Text>
-          <TextInput
+          <DateField
+            label='Fecha del movimiento'
             value={date}
-            onChangeText={setDate}
-            keyboardType='numbers-and-punctuation'
-            style={{
-              borderBottomWidth: 1,
-              borderBottomColor: '#ddd',
-              fontFamily: regular,
-              fontSize: 16,
-              paddingVertical: 10,
-              color: INK,
-            }}
+            onChange={setDate}
+            maximumDate={todayKey}
           />
           <Text
             style={{

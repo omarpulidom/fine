@@ -29,6 +29,7 @@
     "@formatjs/intl-pluralrules": "5.4.6",
     "@formatjs/intl-relativetimeformat": "11.4.13",
     "@gorhom/bottom-sheet": "^5.2.6",
+    "@react-native-community/datetimepicker": "8.4.4",
     "@react-navigation/bottom-tabs": "^7.8.12",
     "clsx": "2.1.1",
     "date-fns": "4.1.0",

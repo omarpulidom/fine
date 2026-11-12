@@ -2,6 +2,7 @@ import { BottomSheetTextInput as TextInput } from '@gorhom/bottom-sheet'
 import { useEffect, useState } from 'react'
 import { Pressable, ScrollView, Text, View } from 'react-native'
 import { AppBottomSheet } from '@/components/ui/AppBottomSheet'
+import { DateField } from '@/components/ui/DateField'
 import { addDaysKey, isDateKey } from './dates'
 import type { LiquidAccount } from './ledger'
 import { formatMoneyInput, parseAmount } from './money'
@@ -37,12 +38,10 @@ export function ScheduledMovementModal({
   const [description, setDescription] = useState('')
   const [accountId, setAccountId] = useState(accounts[0]?.id ?? '')
   const [counterpartyAccountId, setCounterpartyAccountId] = useState('')
-  const [dateChoice, setDateChoice] = useState<'tomorrow' | 'week' | 'custom'>('tomorrow')
-  const [customDate, setCustomDate] = useState('')
+  const [startDate, setStartDate] = useState(addDaysKey(todayKey, 1))
   const [recurrence, setRecurrence] = useState<DraftMovement['recurrence']>(undefined)
   const [endDateInput, setEndDateInput] = useState('')
   const [error, setError] = useState('')
-
   const movementTypes: DraftMovement['type'][] =
     initial?.type === 'transfer'
       ? [
@@ -54,6 +53,7 @@ export function ScheduledMovementModal({
           'expense',
           'income',
         ]
+
   useEffect(() => {
     if (!visible) return
     setType(initial?.type ?? 'expense')
@@ -61,8 +61,7 @@ export function ScheduledMovementModal({
     setDescription(initial?.description ?? '')
     setAccountId(initial?.accountId ?? accounts[0]?.id ?? '')
     setCounterpartyAccountId(initial?.counterpartyAccountId ?? '')
-    setDateChoice(initial ? 'custom' : 'tomorrow')
-    setCustomDate(initial?.effectiveDate ?? '')
+    setStartDate(initial?.effectiveDate ?? addDaysKey(todayKey, 1))
     setRecurrence(initial?.recurrence)
     setEndDateInput(initial?.endDate ?? '')
     setError('')
@@ -70,16 +69,12 @@ export function ScheduledMovementModal({
     visible,
     accounts,
     initial,
+    todayKey,
   ])
 
   function save() {
     const amountCents = parseAmount(amount)
-    const effectiveDate =
-      dateChoice === 'tomorrow'
-        ? addDaysKey(todayKey, 1)
-        : dateChoice === 'week'
-          ? addDaysKey(todayKey, 7)
-          : customDate.trim()
+    const effectiveDate = startDate
 
     if (amountCents === null || amountCents <= 0) {
       setError('Ingresa un importe mayor que cero.')
@@ -325,84 +320,6 @@ export function ScheduledMovementModal({
             marginTop: 25,
           }}
         >
-          Fecha
-        </Text>
-        <View
-          style={{
-            flexDirection: 'row',
-            gap: 8,
-            marginTop: 11,
-          }}
-        >
-          {(
-            [
-              [
-                'tomorrow',
-                'Mañana',
-              ],
-              [
-                'week',
-                'En 7 días',
-              ],
-              [
-                'custom',
-                'Otra fecha',
-              ],
-            ] as const
-          ).map(([value, label]) => (
-            <Pressable
-              key={value}
-              onPress={() => setDateChoice(value)}
-              style={{
-                paddingVertical: 9,
-                paddingHorizontal: 12,
-                borderRadius: 9,
-                backgroundColor: dateChoice === value ? '#e8e8e8' : '#f7f7f7',
-              }}
-            >
-              <Text
-                style={{
-                  fontFamily: medium,
-                  color: INK,
-                  fontSize: 12,
-                }}
-              >
-                {label}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-        {dateChoice === 'custom' && (
-          <TextInput
-            value={customDate}
-            onChangeText={(value) => {
-              setCustomDate(value)
-              setError('')
-            }}
-            placeholder='AAAA-MM-DD'
-            placeholderTextColor='#b9b9b9'
-            keyboardType='numbers-and-punctuation'
-            autoCapitalize='none'
-            style={{
-              borderBottomWidth: 1,
-              borderBottomColor: '#e3e3e3',
-              marginTop: 12,
-              paddingVertical: 10,
-              color: INK,
-              fontFamily: regular,
-              fontSize: 16,
-            }}
-          />
-        )}
-
-        <Text
-          style={{
-            fontFamily: medium,
-            color: MUTED,
-            fontSize: 13,
-            marginTop: 25,
-          }}
-        >
           Repetición
         </Text>
         <ScrollView
@@ -455,24 +372,40 @@ export function ScheduledMovementModal({
             </Pressable>
           ))}
         </ScrollView>
-        {recurrence && (
-          <TextInput
-            value={endDateInput}
-            onChangeText={setEndDateInput}
-            placeholder='Termina el (AAAA-MM-DD), opcional'
-            placeholderTextColor='#b9b9b9'
-            keyboardType='numbers-and-punctuation'
+        <View
+          style={{
+            flexDirection: 'row',
+            gap: 12,
+          }}
+        >
+          <DateField
+            label='Fecha de inicio'
+            value={startDate}
+            onChange={(value) => {
+              setStartDate(value)
+              setError('')
+            }}
+            minimumDate={addDaysKey(todayKey, 1)}
+            compact
             style={{
-              borderBottomWidth: 1,
-              borderBottomColor: '#e3e3e3',
-              marginTop: 12,
-              paddingVertical: 10,
-              color: INK,
-              fontFamily: regular,
-              fontSize: 14,
+              flex: 1,
             }}
           />
-        )}
+          {recurrence && (
+            <DateField
+              label='Fecha de término'
+              value={endDateInput}
+              onChange={setEndDateInput}
+              minimumDate={startDate}
+              placeholder='Opcional'
+              clearable
+              compact
+              style={{
+                flex: 1,
+              }}
+            />
+          )}
+        </View>
 
         <Text
           style={{
