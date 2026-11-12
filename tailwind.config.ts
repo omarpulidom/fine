@@ -7,7 +7,6 @@ const config: Config = {
     './src/app/**/*.{js,ts,tsx}',
     './src/components/**/*.{js,ts,tsx}',
   ],
-
   presets: [
     require('nativewind/preset'),
   ],
@@ -15,57 +14,25 @@ const config: Config = {
     extend: {
       colors: Colors,
       fontFamily: {
-        montserrat: [
-          AppFontNames.Montserrat_500Medium,
-        ],
-        'montserrat-thin': [
-          AppFontNames.Montserrat_100Thin,
-        ],
-        'montserrat-extralight': [
-          AppFontNames.Montserrat_200ExtraLight,
-        ],
-        'montserrat-light': [
-          AppFontNames.Montserrat_300Light,
-        ],
-        'montserrat-regular': [
-          AppFontNames.Montserrat_400Regular,
-        ],
-        'montserrat-medium': [
-          AppFontNames.Montserrat_500Medium,
-        ],
-        'montserrat-semibold': [
-          AppFontNames.Montserrat_600SemiBold,
-        ],
-        'montserrat-bold': [
-          AppFontNames.Montserrat_700Bold,
-        ],
-        'montserrat-extrabold': [
-          AppFontNames.Montserrat_800ExtraBold,
-        ],
-        'montserrat-black': [
-          AppFontNames.Montserrat_900Black,
-        ],
-
         sans: [
-          AppFontNames.Montserrat_500Medium,
+          AppFontNames.Inter_400Regular,
           'sans-serif',
         ],
-        mono: [
-          AppFontNames.Montserrat_500Medium,
-          'monospace',
+        inter: [
+          AppFontNames.Inter_400Regular,
         ],
-        primary: [
-          AppFontNames.Montserrat_500Medium,
-          'sans-serif',
+        'inter-medium': [
+          AppFontNames.Inter_500Medium,
         ],
-        secondary: [
-          AppFontNames.Montserrat_500Medium,
-          'sans-serif',
+        'inter-semibold': [
+          AppFontNames.Inter_600SemiBold,
+        ],
+        'inter-bold': [
+          AppFontNames.Inter_700Bold,
         ],
       },
     },
   },
-
   plugins: [],
 }
 

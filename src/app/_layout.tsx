@@ -1,5 +1,5 @@
 import '../global.css'
-import { useFonts } from '@expo-google-fonts/montserrat'
+import { useFonts } from '@expo-google-fonts/inter'
 import { Stack } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
 import { StatusBar } from 'expo-status-bar'
@@ -44,7 +44,7 @@ export default function RootLayout() {
         flex: 1,
       }}
     >
-      <StatusBar hidden={true} backgroundColor={'transparent'} />
+      <StatusBar style='dark' backgroundColor='#f6f6f6' />
       <AppProviders>
         <RootStack />
       </AppProviders>

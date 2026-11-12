@@ -1,0 +1,304 @@
+# Especificación funcional — MVP de finanzas personales
+
+> Documento para implementar con Codex. Estado: propuesta de MVP; las decisiones indicadas como **pendientes** no deben tratarse como requisitos confirmados.
+
+## 1. Objetivo del producto
+
+Construir una aplicación móvil para visualizar **la liquidez futura por día**, a partir de los **saldos actuales** y de **movimientos existentes o explícitamente programados**. La pregunta principal que debe responder es: **«¿Cuánto dinero tendré disponible en una fecha específica?»**.
+
+La app no busca predecir hábitos ni estimar consumos futuros. Es una proyección determinista de los movimientos conocidos.
+
+### Reglas innegociables
+
+- **No** agregar un gasto diario estimado.
+- **No** inventar ingresos, gastos ni movimientos futuros no programados.
+- La proyección solo cambia cuando existen movimientos efectivos o programados para esas fechas.
+- Diferenciar **compra a crédito**, **deuda**, **pago programado** y **pago efectivamente realizado** para no duplicar descuentos.
+- El registro de movimientos debe ser rápido y simple.
+
+## 2. Alcance del MVP
+
+### Funcionalidades principales
+
+1. **Cuentas y saldos actuales**: efectivo, cuentas bancarias/débito y tarjetas de crédito.
+2. **Registro rápido de ingresos y gastos**: monto, fecha, cuenta/medio de pago y concepto opcional.
+3. **Movimientos programados**: únicos o recurrentes (por ejemplo, nómina, suscripciones, servicios).
+4. **Tarjetas de crédito**: corte, fecha límite, saldo facturado/deuda actual, compras y pagos.
+5. **Gráfica interactiva de liquidez**: navegar por días y consultar el saldo proyectado de cada fecha; horizontes sugeridos de 7, 30, 60 y 90 días.
+6. **Historial de movimientos** con capacidad de editar o corregir registros.
+
+### Posibles funciones posteriores, no bloqueantes para el MVP
+
+- Simulación de una compra hipotética («¿y si compro esto?») sin guardarla como movimiento real.
+- Compras a meses sin intereses (MSI), si no se incluyen desde la primera versión.
+- Estadísticas por categorías, presupuestos, metas de ahorro, préstamos y análisis con IA.
+- Backend, sincronización bancaria, OCR y autenticación.
+
+## 3. Pantalla principal
+
+La gráfica de liquidez es el componente central:
+
+- Mostrar saldo disponible de hoy.
+- Curva de saldo proyectado por día.
+- Permitir tocar/arrastrar sobre la curva para consultar **fecha + saldo**.
+- Mostrar cambios únicamente en días con movimientos previstos; una línea horizontal en periodos sin eventos.
+- Distinguir tramo histórico/actual y tramo proyectado.
+- Mostrar próximos ingresos, gastos y pagos programados.
+- Acceso inmediato a **Añadir movimiento**.
+
+**Definición de liquidez para esta pantalla:** dinero disponible en efectivo y cuentas bancarias; una deuda con tarjeta **no** disminuye automáticamente esa liquidez hasta el día de su pago proyectado o efectivo.
+
+Es posible agregar más adelante una segunda curva de «saldo neto» (liquidez menos obligaciones), pero **no es necesaria para la primera versión**.
+
+## 4. Motor de proyección determinista
+
+Para cada día `d`:
+
+```text
+saldo_proyectado(d) = saldo_disponible_hoy
+                    + suma(ingresos futuros hasta d)
+                    - suma(gastos pagados desde efectivo/débito hasta d)
+                    - suma(pagos de tarjetas programados hasta d)
+                    +/- transferencias netas según cuentas incluidas
+```
+
+### Comportamiento requerido
+
+- Comenzar desde los **saldos actuales**, no volver a sumar/restar movimientos ya reflejados en ellos.
+- Generar ocurrencias futuras a partir de recurrencias explícitamente configuradas.
+- No incluir ninguna estimación de consumo diario ni ingresos hipotéticos.
+- Un gasto nuevo en efectivo/débito **realizado hoy** actualiza el saldo actual y, por tanto, la proyección futura; no debe descontarse dos veces.
+- Un gasto **programado para el futuro** no modifica el saldo actual: se aplica en su fecha.
+- Una transferencia entre dos cuentas propias incluidas en la liquidez no altera el total agregado; sí ajusta cada cuenta individual.
+- Una compra con tarjeta aumenta la deuda, pero no reduce la liquidez hasta que se pague.
+- Los pagos realizados reemplazan o reducen sus obligaciones programadas relacionadas, **sin duplicación**.
+
+### Ejemplo simple
+
+| Fecha | Evento | Liquidez proyectada |
+|---|---|---:|
+| 11 nov | Saldo disponible actual | $5,000 |
+| 12 nov | Pago programado de tarjeta -$2,000 | $3,000 |
+| 15 nov | Ingreso programado +$6,000 | $9,000 |
+| 20 nov | Suscripción programada -$200 | $8,800 |
+
+> Ejemplos ilustrativos en MXN; no constituyen estimaciones automáticas.
+
+## 5. Tarjetas de crédito
+
+### 5.1 Configuración de una tarjeta
+
+Campos sugeridos:
+
+- Nombre identificador.
+- Institución/emisor (opcional).
+- Límite de crédito (opcional para calcular liquidez).
+- Día habitual de corte.
+- Fecha límite de pago / regla de calendario (con posibilidad de **corrección manual** por ciclo).
+- Cuenta bancaria desde la que se prevé pagar.
+- Saldo total de deuda actual.
+- **Saldo facturado pendiente** del último estado de cuenta y su fecha límite.
+- Compras posteriores al último corte aún no facturadas, cuando proceda.
+
+**Importante:** no asumir que «deuda actual», «saldo al corte», «pago mínimo» y «pago para no generar intereses» son equivalentes.
+
+### 5.2 Registro de compras
+
+Cuando se registra una compra de crédito:
+
+1. Guardar la transacción con tarjeta, importe y fecha.
+2. Identificar el ciclo de facturación correspondiente.
+3. Aumentar la deuda pendiente (o reducir el crédito disponible si se lleva ese dato).
+4. **No** restar la compra de la liquidez bancaria de inmediato.
+5. Incorporar el importe al saldo facturado del ciclo cuando corresponda.
+6. Actualizar la obligación de pago vinculada al ciclo y la proyección resultante.
+
+Para compras exactamente en la fecha de corte, **no asumir** que su inclusión en ese estado de cuenta es universal: dependerá del registro/posteo bancario. Permitir reasignar el ciclo manualmente.
+
+### 5.3 Ejemplo de fechas de corte y pago
+
+Tarjeta hipotética que corta el **12 de cada mes** y cuyo ciclo de noviembre vence el **2 de diciembre**:
+
+| Compra | Ciclo ilustrativo | Fecha de pago proyectada |
+|---|---|---|
+| 10 de noviembre | Cierra el 12 de noviembre | 2 de diciembre |
+| 13 de noviembre | Cierra el 12 de diciembre | 2 de enero |
+
+Estas fechas son **ejemplos**, no una regla universal: la fecha límite exacta debe configurarse o confirmarse por ciclo.
+
+### 5.4 Pago programado vs. pago real
+
+Cada ciclo debe poder representar:
+
+- **Saldo facturado**.
+- **Pago para no generar intereses (PPNGI)**, si se conoce.
+- **Pago mínimo**, si se conoce (informativo).
+- **Monto programado a pagar** y **fecha programada**.
+- **Pagos realizados**, que reducen el saldo pendiente de la obligación.
+
+La gráfica utiliza el **monto y la fecha del pago programado**. Cuando hay pago real, este afecta el saldo disponible y reduce/reemplaza la obligación pendiente para impedir doble descuento.
+
+No modelar automáticamente intereses, comisiones o cargos por mora en el MVP: introducirlos solo como movimientos registrados cuando sean conocidos.
+
+### 5.5 Deuda existente al incorporar la tarjeta
+
+Para inicializar una tarjeta ya utilizada, pedir al menos:
+
+1. Deuda pendiente actual.
+2. Importe facturado pendiente (del corte previo).
+3. Fecha límite correspondiente.
+4. Importe no facturado incluido en la deuda actual, si existe.
+
+Comprobar que los importes sean coherentes y **no duplicar** saldos históricos con compras nuevas. Si faltan datos, permitir introducir una obligación inicial editable sin inventar una distribución por ciclos.
+
+### 5.6 Estrategia de pago predeterminada — decisión pendiente
+
+Se discutieron dos alternativas:
+
+- **A. Automática (propuesta)**: sugerir pagar el saldo facturado completo en la fecha límite de cada ciclo; permitir modificar monto y fecha por ciclo.
+- **B. Manual**: proyectar pagos únicamente cuando el usuario los programe expresamente.
+
+**No dar por decidida A o B todavía.** Diseñar el motor para aceptar pagos programados explícitos; implementar la política predeterminada una vez confirmada. Si se usa A, no confundir saldo facturado con PPNGI en presencia de MSI u otros productos.
+
+### 5.7 MSI — extensión opcional
+
+Una compra de $6,000 a 6 MSI debe registrar deuda de $6,000, pero distribuir en los ciclos correspondientes seis mensualidades de $1,000 (salvo diferencias por redondeo o condiciones de la institución). La liquidez disminuye únicamente en las fechas de pago programadas de los estados de cuenta. No asumir de manera universal cuándo comienza a facturarse la primera mensualidad.
+
+Los MSI son útiles, pero **pueden quedar fuera de la primera entrega** para mantener acotado el MVP.
+
+## 6. Registro rápido de movimientos
+
+### Flujo sugerido
+
+1. Tocar botón `+`.
+2. Elegir **Gasto** o **Ingreso**.
+3. Indicar importe.
+4. Elegir cuenta/medio de pago.
+5. Fecha por defecto: hoy.
+6. Concepto opcional.
+7. Guardar.
+
+Si se usa tarjeta de crédito, mostrar la tarjeta y el ciclo/pago estimado. El usuario no tiene que ingresar por separado el futuro pago de cada compra; se agrupa por ciclo.
+
+Al crear un movimiento para el futuro, ofrecer **único o recurrente**. Mantener la cantidad de campos obligatorios al mínimo.
+
+## 7. Modelo conceptual de datos
+
+Una estructura inicial posible (nombres orientativos):
+
+### `Account`
+
+- `id`
+- `name`
+- `type`: `cash | bank | credit_card`
+- `currentBalance` (para cuentas líquidas)
+- `currency`
+
+### `CreditCardDetails`
+
+- `accountId`
+- `creditLimit` (opcional)
+- `cutoffDay`
+- `paymentRule` (regla de fecha límite o fechas confirmadas por ciclo)
+- `defaultPaymentAccountId`
+- `outstandingDebt`
+
+### `Transaction`
+
+- `id`
+- `amount`
+- `type`: `income | expense | transfer | credit_purchase | card_payment`
+- `accountId`
+- `counterpartyAccountId` (si aplica)
+- `occurredAt` / `effectiveDate`
+- `status`: `scheduled | completed | cancelled`
+- `description`
+- `billingCycleId` (si aplica)
+- `recurrenceId` (si aplica)
+
+### `Recurrence`
+
+- `id`
+- `frequency` (semanal, quincenal, mensual, etc.)
+- `startDate`
+- `endDate` (opcional)
+- `template` (datos del movimiento que se genera)
+
+### `BillingCycle`
+
+- `id`
+- `creditCardAccountId`
+- `periodStart`
+- `cutoffDate`
+- `dueDate`
+- `statementAmount`
+- `paymentToAvoidInterest` (opcional)
+- `minimumPayment` (opcional)
+
+### `ScheduledCardPayment`
+
+- `id`
+- `billingCycleId`
+- `sourceAccountId`
+- `scheduledDate`
+- `scheduledAmount`
+- `status`
+- `paidAmount`
+
+**Requisito técnico importante:** evitar mantener múltiples fuentes editables de verdad para el mismo saldo. Definir explícitamente si cada balance se obtiene de movimientos + saldo inicial o si se maneja como saldo actual con reconciliaciones. Guardar los vínculos entre pagos y ciclos, y contemplar pagos parciales/adelantados para evitar duplicaciones.
+
+## 8. Pantallas iniciales
+
+**Inicio**
+- Liquidez hoy.
+- Gráfica diaria interactiva.
+- Fecha seleccionada y saldo correspondiente.
+- Próximos movimientos y pagos de tarjeta.
+- Acción rápida de registro.
+
+**Movimientos**
+- Historial de movimientos.
+- Crear, editar y eliminar/cancelar.
+- Programación de movimientos recurrentes.
+
+**Configuración de cuentas/tarjetas** (pantallas secundarias)
+- Crear y ajustar cuentas, saldo inicial y tarjetas.
+- Editar corte, vencimientos y pagos previstos.
+
+## 9. Criterios de aceptación
+
+- [ ] Si no hay movimientos programados, la proyección futura permanece constante.
+- [ ] Un ingreso futuro aparece en la gráfica desde la fecha programada, no antes.
+- [ ] Un gasto futuro de débito aparece desde su fecha programada, no antes.
+- [ ] Una compra de crédito no disminuye la liquidez bancaria el día de la compra.
+- [ ] Una compra de crédito se asocia al ciclo correspondiente y ajusta su obligación de pago.
+- [ ] Compras antes/después del corte pueden asociarse a diferentes ciclos.
+- [ ] Un pago de tarjeta proyectado disminuye la liquidez solo en su fecha programada.
+- [ ] Marcar un pago como completado no genera un segundo descuento.
+- [ ] Los pagos parciales reducen el pendiente sin borrar la deuda remanente.
+- [ ] Registrar una cuenta/tarjeta con saldo previo no duplica movimientos históricos.
+- [ ] El usuario puede corregir fechas de pago y asignación de ciclos.
+- [ ] Las recurrencias solo producen movimientos definidos explícitamente.
+- [ ] No existen estimaciones automáticas de gastos diarios ni movimientos inventados.
+- [ ] La gráfica permite seleccionar días y consultar el saldo exacto proyectado.
+
+## 10. Orientación de implementación
+
+Se había planteado un stack local-first de **React Native + Expo + TypeScript + SQLite**, pero no es un requisito cerrado ni debe imponerse si el proyecto ya cuenta con una arquitectura. Reutilizar la tecnología existente.
+
+Separar al menos:
+
+1. Persistencia de cuentas/movimientos/ciclos.
+2. Cálculo de recurrencias y calendario de pagos.
+3. Motor puro de proyección por días.
+4. Interfaz de captura y gráfica.
+
+Preferir operaciones reproducibles y pruebas unitarias en el motor financiero; la interfaz no debe recalcular por su cuenta reglas monetarias.
+
+## 11. Instrucciones para Codex
+
+1. Primero inspecciona la estructura del repositorio y sus convenciones.
+2. Usa este documento como **especificación funcional**, no como autorización para rehacer arquitectura existente.
+3. Identifica las decisiones pendientes (especialmente la política automática/manual de pagos y si MSI entra en v1) antes de asumir comportamiento.
+4. Propón una implementación incremental: datos y reglas → proyección → tarjetas → UI.
+5. Mantén el MVP pequeño y no agregues características de pronóstico, IA, sincronización bancaria ni estadísticas no solicitadas.
