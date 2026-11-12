@@ -718,6 +718,39 @@ export default function HomeTab() {
             </Text>
             <Feather name='arrow-right' size={17} color={MUTED} />
           </Pressable>
+          <Pressable
+            onPress={() => router.push('/stats')}
+            accessibilityRole='button'
+            style={{
+              marginTop: 9,
+              height: 56,
+              borderRadius: 12,
+              backgroundColor: '#fff',
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingHorizontal: 18,
+            }}
+          >
+            <Feather
+              name='bar-chart-2'
+              size={17}
+              color={INK}
+              style={{
+                marginRight: 18,
+              }}
+            />
+            <Text
+              style={{
+                flex: 1,
+                color: INK,
+                fontFamily: font.medium,
+                fontSize: 15,
+              }}
+            >
+              Estadísticas mensuales
+            </Text>
+            <Feather name='arrow-right' size={17} color={MUTED} />
+          </Pressable>
         </View>
 
         <View
