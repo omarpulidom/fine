@@ -18,7 +18,7 @@ import {
   upsertCompletedMovement,
 } from '@/features/finance/ledger'
 import { formatMoney, parseAmount } from '@/features/finance/money'
-import { projectLiquidity } from '@/features/finance/projection'
+import { projectLiquidityBreakdown } from '@/features/finance/projection'
 import { ScheduledMovementModal } from '@/features/finance/ScheduledMovementModal'
 import {
   deleteScheduledMovement,
@@ -98,7 +98,7 @@ export default function HomeTab() {
     () =>
       balanceCents === null
         ? []
-        : projectLiquidity(
+        : projectLiquidityBreakdown(
             balanceCents,
             todayKey,
             movements,
@@ -143,7 +143,7 @@ export default function HomeTab() {
   )
 
   const chartPadding = 12
-  const todayX = chartPadding + (chartWidth - chartPadding * 2) * 0.56
+  const todayX = chartPadding + (chartWidth - chartPadding * 2) * 0.38
   const historyDays = history.length - 1
   const selectedX =
     selectedDay < 0 && historyDays > 0
@@ -154,6 +154,12 @@ export default function HomeTab() {
     ...history,
     ...projection,
   ].map((point) => point.balanceCents)
+  if (balanceCents !== null) {
+    for (const point of projection) {
+      balances.push(balanceCents + point.incomeCents)
+      balances.push(balanceCents - point.expenseCents)
+    }
+  }
   const minimumBalance = balances.length ? Math.min(...balances) : 0
   const maximumBalance = balances.length ? Math.max(...balances) : 0
   const range = maximumBalance - minimumBalance
@@ -171,13 +177,17 @@ export default function HomeTab() {
       return index === 0 ? `M ${x} ${y}` : `H ${x} V ${y}`
     })
     .join(' ')
-  const chartPath = projection
-    .map((point, index) => {
-      const x = todayX + (index / horizonDays) * (chartWidth - chartPadding - todayX)
-      const y = yForBalance(point.balanceCents)
-      return index === 0 ? `M ${x} ${y}` : `H ${x} V ${y}`
-    })
-    .join(' ')
+  const futurePath = (valueForPoint: (point: (typeof projection)[number]) => number) =>
+    projection
+      .map((point, index) => {
+        const x = todayX + (index / horizonDays) * (chartWidth - chartPadding - todayX)
+        const y = yForBalance(valueForPoint(point))
+        return index === 0 ? `M ${x} ${y}` : `H ${x} V ${y}`
+      })
+      .join(' ')
+  const chartPath = futurePath((point) => point.balanceCents)
+  const incomePath = futurePath((point) => (balanceCents ?? 0) + point.incomeCents)
+  const expensePath = futurePath((point) => (balanceCents ?? 0) - point.expenseCents)
 
   function selectAt(x: number) {
     if (x < todayX && historyDays > 0) {
@@ -386,8 +396,24 @@ export default function HomeTab() {
                   fill='none'
                 />
                 <Path
+                  d={incomePath}
+                  stroke='#c6c6c6'
+                  strokeWidth={2.5}
+                  strokeLinecap='round'
+                  strokeLinejoin='round'
+                  fill='none'
+                />
+                <Path
+                  d={expensePath}
+                  stroke='#a4a4a4'
+                  strokeWidth={2.5}
+                  strokeLinecap='round'
+                  strokeLinejoin='round'
+                  fill='none'
+                />
+                <Path
                   d={chartPath}
-                  stroke='#d4d4d4'
+                  stroke={INK}
                   strokeWidth={3.5}
                   strokeLinecap='round'
                   strokeLinejoin='round'
@@ -442,6 +468,73 @@ export default function HomeTab() {
             </Text>
           </View>
         </View>
+
+        <View
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'center',
+            gap: 13,
+            marginTop: 7,
+          }}
+        >
+          {(
+            [
+              [
+                '#101010',
+                'Saldo',
+              ],
+              [
+                '#c6c6c6',
+                '+ Ingresos',
+              ],
+              [
+                '#a4a4a4',
+                '− Gastos',
+              ],
+            ] as const
+          ).map(([color, label]) => (
+            <View
+              key={label}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 5,
+              }}
+            >
+              <View
+                style={{
+                  width: 15,
+                  height: 3,
+                  borderRadius: 2,
+                  backgroundColor: color,
+                }}
+              />
+              <Text
+                style={{
+                  color: MUTED,
+                  fontFamily: font.regular,
+                  fontSize: 11,
+                }}
+              >
+                {label}
+              </Text>
+            </View>
+          ))}
+        </View>
+        {selectedDay > 0 && projection[selectedDay] && (
+          <Text
+            style={{
+              color: MUTED,
+              fontFamily: font.regular,
+              fontSize: 12,
+              textAlign: 'center',
+              marginTop: 9,
+            }}
+          >
+            Acumulado: +{formatMoney(projection[selectedDay].incomeCents)} ingresos ·{' −'}
+            {formatMoney(projection[selectedDay].expenseCents)} gastos
+          </Text>
+        )}
 
         <View
           style={{

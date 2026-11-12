@@ -6,6 +6,11 @@ export type ProjectionPoint = {
   balanceCents: number
 }
 
+export type ProjectionBreakdownPoint = ProjectionPoint & {
+  incomeCents: number
+  expenseCents: number
+}
+
 export type ScheduledCardPayment = {
   date: string
   amountCents: number
@@ -21,20 +26,50 @@ export function projectLiquidity(
   cardPayments: readonly ScheduledCardPayment[] = [],
   completedOccurrences: ReadonlySet<string> = new Set(),
 ): ProjectionPoint[] {
-  let balanceCents = currentBalanceCents
-  const changesByDate = new Map<string, number>()
+  return projectLiquidityBreakdown(
+    currentBalanceCents,
+    todayKey,
+    movements,
+    horizonDays,
+    cardPayments,
+    completedOccurrences,
+  ).map(({ date, balanceCents }) => ({
+    date,
+    balanceCents,
+  }))
+}
+
+export function projectLiquidityBreakdown(
+  currentBalanceCents: number,
+  todayKey: string,
+  movements: readonly ScheduledMovement[],
+  horizonDays: number,
+  cardPayments: readonly ScheduledCardPayment[] = [],
+  completedOccurrences: ReadonlySet<string> = new Set(),
+): ProjectionBreakdownPoint[] {
+  let incomeCents = 0
+  let expenseCents = 0
+  const changesByDate = new Map<
+    string,
+    {
+      incomeCents: number
+      expenseCents: number
+    }
+  >()
   const horizonKey = addDaysKey(todayKey, horizonDays)
 
   for (const movement of movements) {
-    const sign = movement.type === 'income' ? 1 : movement.type === 'expense' ? -1 : 0
     let occurrence = movement.effectiveDate
     let index = 0
     while (occurrence <= horizonKey && (!movement.endDate || occurrence <= movement.endDate)) {
       if (occurrence > todayKey && !completedOccurrences.has(`${movement.id}:${occurrence}`)) {
-        changesByDate.set(
-          occurrence,
-          (changesByDate.get(occurrence) ?? 0) + sign * movement.amountCents,
-        )
+        const change = changesByDate.get(occurrence) ?? {
+          incomeCents: 0,
+          expenseCents: 0,
+        }
+        if (movement.type === 'income') change.incomeCents += movement.amountCents
+        if (movement.type === 'expense') change.expenseCents += movement.amountCents
+        changesByDate.set(occurrence, change)
       }
       if (!movement.recurrence) break
       index += 1
@@ -47,7 +82,12 @@ export function projectLiquidity(
 
   for (const payment of cardPayments) {
     if (payment.date <= todayKey || payment.date > horizonKey) continue
-    changesByDate.set(payment.date, (changesByDate.get(payment.date) ?? 0) - payment.amountCents)
+    const change = changesByDate.get(payment.date) ?? {
+      incomeCents: 0,
+      expenseCents: 0,
+    }
+    change.expenseCents += payment.amountCents
+    changesByDate.set(payment.date, change)
   }
 
   return Array.from(
@@ -56,10 +96,14 @@ export function projectLiquidity(
     },
     (_, day) => {
       const date = addDaysKey(todayKey, day)
-      balanceCents += changesByDate.get(date) ?? 0
+      const change = changesByDate.get(date)
+      incomeCents += change?.incomeCents ?? 0
+      expenseCents += change?.expenseCents ?? 0
       return {
         date,
-        balanceCents,
+        balanceCents: currentBalanceCents + incomeCents - expenseCents,
+        incomeCents,
+        expenseCents,
       }
     },
   )
