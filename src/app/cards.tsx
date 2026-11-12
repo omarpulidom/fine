@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons'
 import { BottomSheetTextInput as TextInput } from '@gorhom/bottom-sheet'
 import { useFocusEffect } from '@react-navigation/native'
-import { useRouter } from 'expo-router'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useCallback, useState } from 'react'
 import { Alert, Pressable, ScrollView, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -83,6 +83,9 @@ function Field({
 
 export default function CardsScreen() {
   const router = useRouter()
+  const { cardId: focusedCardId } = useLocalSearchParams<{
+    cardId?: string
+  }>()
   const [ledger, setLedger] = useState(getLedger)
   useFocusEffect(
     useCallback(() => {
@@ -115,6 +118,13 @@ export default function CardsScreen() {
   const cycles = ledger.cycles
     .filter((cycle) => cycle.cardId === selectedCardId)
     .sort((a, b) => b.cutoffDate.localeCompare(a.cutoffDate))
+  const visibleCards = focusedCardId
+    ? [
+        ...ledger.cards,
+      ].sort(
+        (left, right) => Number(right.id === focusedCardId) - Number(left.id === focusedCardId),
+      )
+    : ledger.cards
 
   function open(
     nextMode: FormMode,
@@ -438,7 +448,7 @@ export default function CardsScreen() {
             {ledger.accounts.length ? 'Añadir tarjeta' : 'Añadir cuenta bancaria primero'}
           </Text>
         </Pressable>
-        {ledger.cards.map((card) => {
+        {visibleCards.map((card) => {
           const cardCycles = ledger.cycles
             .filter((cycle) => cycle.cardId === card.id)
             .sort((a, b) => b.cutoffDate.localeCompare(a.cutoffDate))
@@ -450,6 +460,9 @@ export default function CardsScreen() {
               key={card.id}
               style={{
                 marginTop: 24,
+                borderWidth: card.id === focusedCardId ? 1.5 : 0,
+                borderColor: INK,
+                borderRadius: 12,
               }}
             >
               <View

@@ -1,6 +1,6 @@
 import { Feather } from '@expo/vector-icons'
 import { BottomSheetTextInput as TextInput } from '@gorhom/bottom-sheet'
-import { useRouter } from 'expo-router'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useState } from 'react'
 import { Pressable, ScrollView, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -23,12 +23,20 @@ const semibold = 'Inter_600SemiBold'
 
 export default function AccountsScreen() {
   const router = useRouter()
+  const { accountId } = useLocalSearchParams<{
+    accountId?: string
+  }>()
   const [ledger, setLedger] = useState(getLedger)
   const [editing, setEditing] = useState<LiquidAccount | null | undefined>(undefined)
   const [name, setName] = useState('')
   const [type, setType] = useState<LiquidAccount['type']>('bank')
   const [balance, setBalance] = useState('')
   const [error, setError] = useState('')
+  const visibleAccounts = accountId
+    ? [
+        ...ledger.accounts,
+      ].sort((left, right) => Number(right.id === accountId) - Number(left.id === accountId))
+    : ledger.accounts
 
   function open(account: LiquidAccount | null) {
     setEditing(account)
@@ -120,7 +128,7 @@ export default function AccountsScreen() {
           Saldos actuales en efectivo y cuentas bancarias. Ajusta un saldo cuando lo reconcilies con
           tu banco.
         </Text>
-        {ledger.accounts.map((account) => (
+        {visibleAccounts.map((account) => (
           <Pressable
             key={account.id}
             onPress={() => open(account)}
@@ -129,6 +137,8 @@ export default function AccountsScreen() {
               padding: 18,
               backgroundColor: '#fff',
               borderRadius: 12,
+              borderWidth: account.id === accountId ? 1.5 : 0,
+              borderColor: INK,
               flexDirection: 'row',
               alignItems: 'center',
             }}
