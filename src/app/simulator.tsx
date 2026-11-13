@@ -10,7 +10,7 @@ import { AppBottomSheet } from '@/components/ui/AppBottomSheet'
 import { DateField } from '@/components/ui/DateField'
 import { addDaysKey, localDateKey } from '@/features/finance/dates'
 import { allocateInstallments } from '@/features/finance/installments'
-import { getLedger, totalLiquidity } from '@/features/finance/ledger'
+import { getLedger, projectedCardPayments, totalLiquidity } from '@/features/finance/ledger'
 import { formatMoney, formatMoneyInput, parseAmount } from '@/features/finance/money'
 import { projectLiquidity } from '@/features/finance/projection'
 import { getScheduledMovements } from '@/features/finance/scheduledMovements'
@@ -61,16 +61,7 @@ export default function SimulatorScreen() {
       ledger,
     ],
   )
-  const cardPayments = ledger.cycles.flatMap((cycle) =>
-    cycle.scheduledDate && cycle.scheduledAmountCents > cycle.paidAmountCents
-      ? [
-          {
-            date: cycle.scheduledDate,
-            amountCents: cycle.scheduledAmountCents - cycle.paidAmountCents,
-          },
-        ]
-      : [],
-  )
+  const cardPayments = projectedCardPayments(ledger)
   const baseline = projectLiquidity(
     totalLiquidity(ledger),
     todayKey,
