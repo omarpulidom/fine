@@ -44,7 +44,7 @@ La gráfica de liquidez es el componente central:
 - Mostrar saldo disponible de hoy.
 - Curva de saldo proyectado por día.
 - En la proyección, tres trazos desde el saldo de hoy: saldo total en negro, saldo más ingresos acumulados en gris claro y saldo menos gastos acumulados en gris más oscuro. Los gastos incluyen pagos de tarjeta programados explícitamente. Un badge compacto muestra solo los ingresos y gastos no nulos del día elegido.
-- Permitir tocar/arrastrar sobre la curva para consultar **fecha + saldo**.
+- Permitir tocar/arrastrar sobre la curva para consultar **fecha + saldo**. Un arrastre iniciado en el área de la gráfica selecciona fechas sin mover el carrusel; fuera de la gráfica se puede deslizar entre sus páginas, y el desplazamiento vertical de la pantalla sigue disponible.
 - Mostrar cambios únicamente en días con movimientos previstos; una línea horizontal en periodos sin eventos.
 - Distinguir tramo histórico/actual y tramo proyectado.
 - Mostrar próximos ingresos, gastos y pagos programados en una lista cronológica con filtro de todos, ingresos o gastos. Cada fila separa título e importe de fecha y acciones.

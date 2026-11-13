@@ -51,7 +51,9 @@ export default function HomeTab() {
   const { width: screenWidth } = useWindowDimensions();
   const chartWidth = screenWidth - 48;
   const carouselRef = useRef<ScrollView>(null);
+  const chartTouchStart = useRef({ x: 0, y: 0 });
   const [carouselPage, setCarouselPage] = useState<0 | 1>(0);
+  const [chartGestureActive, setChartGestureActive] = useState(false);
   const carouselHeight = Math.max(340, getAccountsHubHeight(chartWidth) + 16);
   const [ledger, setLedger] = useState(getLedger);
   const balanceCents = ledger.accounts.length ? totalLiquidity(ledger) : null;
@@ -364,6 +366,7 @@ export default function HomeTab() {
             horizontal
             pagingEnabled
             nestedScrollEnabled
+            scrollEnabled={!chartGestureActive}
             showsHorizontalScrollIndicator={false}
             style={{ width: chartWidth, height: carouselHeight }}
             onMomentumScrollEnd={(event) => {
@@ -380,11 +383,24 @@ export default function HomeTab() {
                     marginTop: 10,
                     height: 258,
                   }}
-                  onTouchStart={(event) => {
+                  onStartShouldSetResponder={() => true}
+                  onResponderGrant={(event) => {
+                    setChartGestureActive(true);
+                    chartTouchStart.current = {
+                      x: event.nativeEvent.pageX,
+                      y: event.nativeEvent.pageY,
+                    };
                     if (balanceCents !== null) selectAt(event.nativeEvent.locationX);
                   }}
-                  onTouchMove={(event) => {
+                  onResponderMove={(event) => {
                     if (balanceCents !== null) selectAt(event.nativeEvent.locationX);
+                  }}
+                  onResponderRelease={() => setChartGestureActive(false)}
+                  onResponderTerminate={() => setChartGestureActive(false)}
+                  onResponderTerminationRequest={(event) => {
+                    const horizontal = Math.abs(event.nativeEvent.pageX - chartTouchStart.current.x);
+                    const vertical = Math.abs(event.nativeEvent.pageY - chartTouchStart.current.y);
+                    return vertical > horizontal;
                   }}
                 >
                   <Svg width={chartWidth} height={236}>
