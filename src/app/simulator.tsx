@@ -8,7 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import Svg, { Line, Path } from 'react-native-svg'
 import { AppBottomSheet } from '@/components/ui/AppBottomSheet'
 import { DateField } from '@/components/ui/DateField'
-import { addDaysKey, localDateKey } from '@/features/finance/dates'
+import { addDaysKey, formatShortDateKey, localDateKey } from '@/features/finance/dates'
 import { allocateInstallments } from '@/features/finance/installments'
 import { getLedger, projectedCardPayments, totalLiquidity } from '@/features/finance/ledger'
 import { formatMoney, formatMoneyInput, parseAmount } from '@/features/finance/money'
@@ -335,7 +335,7 @@ export default function SimulatorScreen() {
               color: muted,
             }}
           >
-            Día {selectedDay} · {baseline[selectedDay]?.date}
+            Día {selectedDay} · {formatShortDateKey(baseline[selectedDay]?.date ?? '')}
           </Text>
           <Text
             style={{
@@ -446,7 +446,7 @@ export default function SimulatorScreen() {
                     marginTop: 10,
                   }}
                 >
-                  {payment.date} · {formatMoney(payment.amountCents)}
+                  {formatShortDateKey(payment.date)} · {formatMoney(payment.amountCents)}
                 </Text>
               ))
             ) : (
@@ -571,7 +571,7 @@ export default function SimulatorScreen() {
               }}
             >
               {cycles.map((cycle) =>
-                choice(cycle.cutoffDate, cycle.id === firstCycleId, () =>
+                choice(formatShortDateKey(cycle.cutoffDate), cycle.id === firstCycleId, () =>
                   setFirstCycleId(cycle.id),
                 ),
               )}
@@ -611,7 +611,7 @@ export default function SimulatorScreen() {
                   marginTop: 7,
                 }}
               >
-                {payment.date} · {formatMoney(payment.amountCents)}
+                {formatShortDateKey(payment.date)} · {formatMoney(payment.amountCents)}
               </Text>
             ))}
           </>

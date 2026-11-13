@@ -6,7 +6,7 @@ import { Alert, Pressable, ScrollView, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { AppBottomSheet } from '@/components/ui/AppBottomSheet'
 import { DateField } from '@/components/ui/DateField'
-import { isDateKey, localDateKey } from '@/features/finance/dates'
+import { formatShortDateKey, isDateKey, localDateKey } from '@/features/finance/dates'
 import {
   type CompletedMovement,
   deleteCompletedMovement,
@@ -274,7 +274,7 @@ export default function MovementsScreen() {
                     marginTop: 4,
                   }}
                 >
-                  {movement.effectiveDate} · {account?.name ?? 'Cuenta'}
+                  {formatShortDateKey(movement.effectiveDate)} · {account?.name ?? 'Cuenta'}
                   {movement.type === 'transfer'
                     ? ` → ${ledger.accounts.find((item) => item.id === movement.counterpartyAccountId)?.name ?? 'Cuenta'}`
                     : ''}
