@@ -23,11 +23,14 @@ const semibold = 'Inter_600SemiBold'
 
 export default function AccountsScreen() {
   const router = useRouter()
-  const { accountId } = useLocalSearchParams<{
+  const { accountId, create } = useLocalSearchParams<{
     accountId?: string
+    create?: string
   }>()
   const [ledger, setLedger] = useState(getLedger)
-  const [editing, setEditing] = useState<LiquidAccount | null | undefined>(undefined)
+  const [editing, setEditing] = useState<LiquidAccount | null | undefined>(
+    create === '1' ? null : undefined,
+  )
   const [name, setName] = useState('')
   const [type, setType] = useState<LiquidAccount['type']>('bank')
   const [balance, setBalance] = useState('')

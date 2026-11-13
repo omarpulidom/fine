@@ -83,8 +83,9 @@ function Field({
 
 export default function CardsScreen() {
   const router = useRouter()
-  const { cardId: focusedCardId } = useLocalSearchParams<{
+  const { cardId: focusedCardId, create } = useLocalSearchParams<{
     cardId?: string
+    create?: string
   }>()
   const [ledger, setLedger] = useState(getLedger)
   useFocusEffect(
@@ -92,7 +93,9 @@ export default function CardsScreen() {
       setLedger(getLedger())
     }, []),
   )
-  const [mode, setMode] = useState<FormMode>(null)
+  const [mode, setMode] = useState<FormMode>(
+    create === '1' && ledger.accounts.length ? 'card' : null,
+  )
   const [selectedCardId, setSelectedCardId] = useState('')
   const [selectedCycleId, setSelectedCycleId] = useState('')
   const [selectedActivity, setSelectedActivity] = useState<CardActivity | null>(null)
@@ -107,7 +110,9 @@ export default function CardsScreen() {
   const [installmentMonths, setInstallmentMonths] = useState('3')
   const [activityDate, setActivityDate] = useState(localDateKey(new Date()))
   const [description, setDescription] = useState('')
-  const [sourceAccountId, setSourceAccountId] = useState('')
+  const [sourceAccountId, setSourceAccountId] = useState(
+    create === '1' ? (ledger.accounts[0]?.id ?? '') : '',
+  )
   const [scheduledDate, setScheduledDate] = useState('')
   const [paymentToAvoidInterest, setPaymentToAvoidInterest] = useState('')
   const [minimumPayment, setMinimumPayment] = useState('')
