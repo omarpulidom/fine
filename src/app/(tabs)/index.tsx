@@ -314,18 +314,6 @@ export default function HomeTab() {
           paddingBottom: 48,
         }}
       >
-        <Text
-          style={{
-            marginTop: 20,
-            textAlign: "center",
-            color: INK,
-            fontFamily: font.medium,
-            fontSize: 16,
-          }}
-        >
-          Liquidez
-        </Text>
-
         <View
           style={{
             alignItems: "center",
