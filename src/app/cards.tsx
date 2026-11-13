@@ -23,6 +23,7 @@ import { allocateInstallments } from '@/features/finance/installments'
 import {
   addCardActivity,
   activateAutomaticBilling,
+  type BillingCycle,
   type CardActivity,
   confirmCycleStatement,
   createBillingCycle,
@@ -48,6 +49,15 @@ const regular = 'Inter_400Regular'
 const medium = 'Inter_500Medium'
 const semibold = 'Inter_600SemiBold'
 type FormMode = 'card' | 'settings' | 'cycle' | 'purchase' | 'payment' | 'plan' | 'reassign' | null
+
+function comparePaymentCycles(left: BillingCycle, right: BillingCycle, todayKey: string): number {
+  const leftUpcoming = left.dueDate >= todayKey
+  const rightUpcoming = right.dueDate >= todayKey
+  if (leftUpcoming !== rightUpcoming) return leftUpcoming ? -1 : 1
+  return leftUpcoming
+    ? left.dueDate.localeCompare(right.dueDate)
+    : right.dueDate.localeCompare(left.dueDate)
+}
 
 function Label({ children }: { children: string }) {
   return (
@@ -160,6 +170,9 @@ export default function CardsScreen() {
   const cycles = ledger.cycles
     .filter((cycle) => cycle.cardId === selectedCardId)
     .sort((a, b) => b.cutoffDate.localeCompare(a.cutoffDate))
+  const paymentChoices = cycles
+    .filter((cycle) => statementAmountCents(ledger, cycle.id) > cycle.paidAmountCents)
+    .sort((a, b) => comparePaymentCycles(a, b, todayKey))
   const visibleCards = focusedCardId
     ? [
         ...ledger.cards,
@@ -561,10 +574,9 @@ export default function CardsScreen() {
             .filter((cycle) => cycle.cardId === card.id)
             .sort((a, b) => b.cutoffDate.localeCompare(a.cutoffDate))
           const purchaseCycle = [...cardCycles].reverse().find((cycle) => cycle.cutoffDate >= todayKey)
-          const paymentCycle = [...cardCycles].reverse().find((cycle) =>
-            cycle.dueDate >= todayKey &&
-            statementAmountCents(ledger, cycle.id) > cycle.paidAmountCents)
-            ?? [...cardCycles].reverse().find((cycle) => cycle.dueDate >= todayKey)
+          const paymentCycle = cardCycles
+            .filter((cycle) => statementAmountCents(ledger, cycle.id) > cycle.paidAmountCents)
+            .sort((a, b) => comparePaymentCycles(a, b, todayKey))[0]
           const nextPaymentCycle = [...cardCycles]
             .filter((cycle) => cycle.dueDate >= todayKey &&
               (cycle.paymentMode === 'automatic'
@@ -1050,7 +1062,7 @@ export default function CardsScreen() {
                   marginTop: 10,
                 }}
               >
-                {cycles.map((cycle) => (
+                {(mode === 'payment' ? paymentChoices : cycles).map((cycle) => (
                   <Pressable
                     key={cycle.id}
                     onPress={() => setSelectedCycleId(cycle.id)}
