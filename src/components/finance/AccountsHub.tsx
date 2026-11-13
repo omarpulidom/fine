@@ -37,6 +37,18 @@ const ink = '#101010'
 const medium = 'Inter_500Medium'
 const regular = 'Inter_400Regular'
 const semibold = 'Inter_600SemiBold'
+const hubTopMargin = 0
+const liftSpace = 64
+const actionRowGap = 16
+const walletHeightRatio = 0.66
+
+function getActionSize(width: number) {
+  return Math.min(50, Math.floor((width - 36) / 4))
+}
+
+export function getAccountsHubHeight(width: number) {
+  return hubTopMargin + liftSpace + width * walletHeightRatio + actionRowGap + getActionSize(width)
+}
 
 function WalletInstrumentCard({
   entry,
@@ -128,13 +140,18 @@ export function AccountsHub({
   const [expanded, setExpanded] = useState(false)
   const progress = useSharedValue(0)
   const available = width - 48
-  const gap = 16
-  const actionSize = 50
-  const actionsWidth = actionSize * 2 + 10
-  const walletWidth = available - actionsWidth - gap
-  const walletHeight = walletWidth * 0.78
+  const walletWidth = available
+  const actionSize = getActionSize(walletWidth)
+  const actionGap = Math.min(20, (walletWidth - actionSize * 4) / 3)
+  const walletHeight = walletWidth * walletHeightRatio
   const card = cards[0]
   const account = accounts[0]
+  const productSummary = [
+    accounts.length ? `${accounts.length} ${accounts.length === 1 ? 'cuenta' : 'cuentas'}` : null,
+    cards.length ? `${cards.length} ${cards.length === 1 ? 'tarjeta' : 'tarjetas'}` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
   const visibleEntries: WalletEntry[] = [
     {
       id: card?.id ?? '',
@@ -152,8 +169,7 @@ export function AccountsHub({
     },
   ]
   const extraCount = accounts.length + cards.length - Number(!!account) - Number(!!card)
-  const liftSpace = 64
-  const frontTop = walletWidth * 0.44
+  const frontTop = walletWidth * 0.33
   const addStyle = useAnimatedStyle(() => ({
     opacity: progress.value,
     transform: [
@@ -208,46 +224,10 @@ export function AccountsHub({
   return (
     <View
       style={{
-        flexDirection: 'row',
-        gap,
-        marginTop: 18,
-        height: liftSpace + walletHeight,
+        marginTop: hubTopMargin,
+        height: liftSpace + walletHeight + actionRowGap + actionSize,
       }}
     >
-      <View
-        style={{
-          width: actionsWidth,
-          flexDirection: 'row',
-          flexWrap: 'wrap',
-          justifyContent: 'flex-start',
-          alignContent: 'flex-start',
-          gap: 10,
-          paddingTop: liftSpace,
-        }}
-      >
-        {actions.map((action) => (
-          <Pressable
-            key={action.key}
-            onPress={action.onPress}
-            accessibilityRole='button'
-            accessibilityLabel={action.label}
-            style={{
-              width: actionSize,
-              height: actionSize,
-              borderRadius: actionSize / 2,
-              backgroundColor: '#dedede',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Feather
-              name={action.icon}
-              size={Math.max(17, Math.min(21, actionSize * 0.4))}
-              color={ink}
-            />
-          </Pressable>
-        ))}
-      </View>
       <View
         style={{
           width: walletWidth,
@@ -307,7 +287,7 @@ export function AccountsHub({
             index={index}
             color={index === 0 ? '#7c87bf' : '#f5f5f5'}
             iconColor={index === 0 ? '#fff' : ink}
-            baseTop={index === 0 ? 10 : walletWidth * 0.24}
+            baseTop={index === 0 ? 10 : walletWidth * 0.15}
             lift={index === 0 ? 72 : 28}
             width={walletWidth}
             liftSpace={liftSpace}
@@ -322,19 +302,26 @@ export function AccountsHub({
             }}
           />
         ))}
-        <Svg
-          width={walletWidth}
-          height={30}
-          pointerEvents='none'
+        <Pressable
+          onPress={toggle}
+          accessibilityRole='button'
+          accessibilityLabel={expanded ? 'Ocultar cuentas' : 'Mostrar cuentas y tarjetas'}
+          accessibilityState={{
+            expanded,
+          }}
           style={{
             position: 'absolute',
             top: liftSpace + frontTop - 22,
             left: 0,
-            zIndex: 10,
+            width: walletWidth,
+            height: 30,
+            zIndex: 12,
           }}
         >
-          <Path d={tabPath} fill={ink} />
-        </Svg>
+          <Svg width={walletWidth} height={30} pointerEvents='none'>
+            <Path d={tabPath} fill={ink} />
+          </Svg>
+        </Pressable>
         <Pressable
           onPress={toggle}
           accessibilityRole='button'
@@ -353,7 +340,7 @@ export function AccountsHub({
             borderBottomLeftRadius: 21,
             borderBottomRightRadius: 21,
             justifyContent: 'flex-end',
-            padding: 12,
+            padding: 20,
           }}
         >
           <Text
@@ -376,9 +363,10 @@ export function AccountsHub({
               fontSize: 10,
               color: '#adadad',
               marginTop: 3,
+              paddingRight: 46,
             }}
           >
-            {balanceCents === null ? 'Añadir primera cuenta' : 'Saldo disponible'}
+            {balanceCents === null ? 'Añadir primera cuenta' : productSummary}
           </Text>
         </Pressable>
         {expanded && (
@@ -386,8 +374,8 @@ export function AccountsHub({
             style={[
               {
                 position: 'absolute',
-                right: 9,
-                bottom: 9,
+                right: 16,
+                bottom: 16,
                 zIndex: 12,
               },
               addStyle,
@@ -398,18 +386,51 @@ export function AccountsHub({
               accessibilityRole='button'
               accessibilityLabel='Agregar cuenta o tarjeta de crédito'
               style={{
-                width: 27,
-                height: 27,
-                borderRadius: 14,
+                width: 40,
+                height: 40,
+                borderRadius: 20,
                 backgroundColor: '#eeeeee',
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
             >
-              <Feather name='plus' size={16} color={ink} />
+              <Feather name='plus' size={20} color={ink} />
             </Pressable>
           </Animated.View>
         )}
+      </View>
+      <View
+        style={{
+          height: actionSize,
+          flexDirection: 'row',
+          justifyContent: 'flex-start',
+          alignItems: 'center',
+          gap: actionGap,
+          marginTop: actionRowGap,
+        }}
+      >
+        {actions.map((action) => (
+          <Pressable
+            key={action.key}
+            onPress={action.onPress}
+            accessibilityRole='button'
+            accessibilityLabel={action.label}
+            style={{
+              width: actionSize,
+              height: actionSize,
+              borderRadius: actionSize / 2,
+              backgroundColor: '#dedede',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Feather
+              name={action.icon}
+              size={Math.max(17, Math.min(21, actionSize * 0.4))}
+              color={ink}
+            />
+          </Pressable>
+        ))}
       </View>
     </View>
   )
