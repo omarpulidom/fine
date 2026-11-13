@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Pressable,
@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Circle, Line, Path } from "react-native-svg";
-import { AccountsHub } from "@/components/finance/AccountsHub";
+import { AccountsHub, getAccountsHubHeight } from "@/components/finance/AccountsHub";
 import { ScheduledMovementsList } from "@/components/finance/ScheduledMovementsList";
 import { formatDateDisplay, localDateKey } from "@/features/finance/dates";
 import { liquidityHistory } from "@/features/finance/history";
@@ -50,6 +50,9 @@ export default function HomeTab() {
   const router = useRouter();
   const { width: screenWidth } = useWindowDimensions();
   const chartWidth = screenWidth - 48;
+  const carouselRef = useRef<ScrollView>(null);
+  const [carouselPage, setCarouselPage] = useState<0 | 1>(0);
+  const carouselHeight = Math.max(340, getAccountsHubHeight(chartWidth) + 16);
   const [ledger, setLedger] = useState(getLedger);
   const balanceCents = ledger.accounts.length ? totalLiquidity(ledger) : null;
   const [movements, setMovements] = useState<ScheduledMovement[]>(
@@ -213,6 +216,11 @@ export default function HomeTab() {
     }
   }
 
+  function selectCarouselPage(page: 0 | 1) {
+    setCarouselPage(page);
+    if (page === 1) setSelectedDay(0);
+  }
+
   function addMovement(draft: Omit<ScheduledMovement, "id">) {
     setMovements(
       saveScheduledMovement({
@@ -350,262 +358,308 @@ export default function HomeTab() {
           </Text>
         </View>
 
-        <View
-          accessibilityLabel={`Gráfica de liquidez de los próximos ${horizonDays} días. Desliza para seleccionar una fecha.`}
-          style={{
-            marginTop: 48,
-            height: 258,
-          }}
-          onStartShouldSetResponder={() => balanceCents !== null}
-          onMoveShouldSetResponder={() => balanceCents !== null}
-          onResponderGrant={(event) => selectAt(event.nativeEvent.locationX)}
-          onResponderMove={(event) => selectAt(event.nativeEvent.locationX)}
-        >
-          <Svg width={chartWidth} height={236}>
-            <Line
-              x1={chartPadding}
-              x2={chartWidth - chartPadding}
-              y1={baselineY}
-              y2={baselineY}
-              stroke="#c8c8c8"
-              strokeWidth={1.5}
-              strokeDasharray="1 10"
-              strokeLinecap="round"
-            />
-            {balanceCents !== null && (
-              <>
-                <Path
-                  d={historyPath}
-                  stroke={INK}
-                  strokeWidth={3.5}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  fill="none"
-                />
-                <Path
-                  d={incomePath}
-                  stroke="#c6c6c6"
-                  strokeWidth={2.5}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  fill="none"
-                />
-                <Path
-                  d={expensePath}
-                  stroke="#a4a4a4"
-                  strokeWidth={2.5}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  fill="none"
-                />
-                <Path
-                  d={chartPath}
-                  stroke={INK}
-                  strokeWidth={3.5}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  fill="none"
-                />
-                <Line
-                  x1={selectedX}
-                  x2={selectedX}
-                  y1={28}
-                  y2={baselineY}
-                  stroke="#c5c5c5"
-                  strokeWidth={1}
-                  strokeDasharray="2 5"
-                />
-                <Circle
-                  cx={selectedX}
-                  cy={yForBalance(selectedBalance ?? 0)}
-                  r={5}
-                  fill={INK}
-                />
-              </>
-            )}
-          </Svg>
-          {balanceCents !== null && (selectedIncomeCents > 0 || selectedExpenseCents > 0) && (
-            <View
-              pointerEvents="none"
-              accessible
-              accessibilityLabel={[
-                selectedIncomeCents > 0 ? `Ingresos ${formatMoney(selectedIncomeCents)}` : null,
-                selectedExpenseCents > 0 ? `Gastos ${formatMoney(selectedExpenseCents)}` : null,
-              ].filter(Boolean).join(", ")}
-              onLayout={(event) => setBadgeWidth(event.nativeEvent.layout.width)}
-              style={{
-                position: "absolute",
-                top: 0,
-                left: Math.max(0, Math.min(chartWidth - badgeWidth, selectedX - badgeWidth / 2)),
-                alignItems: "flex-start",
-                maxWidth: chartWidth,
-                borderRadius: 999,
-                backgroundColor: INK,
-                paddingHorizontal: 12,
-                paddingVertical: 6,
-              }}
-            >
-              {selectedIncomeCents > 0 && (
-                <Text
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  style={{ color: "#fff", fontFamily: "Inter_300Light", fontSize: 14 }}
-                >
-                  +{formatMoney(selectedIncomeCents)}
-                </Text>
-              )}
-              {selectedExpenseCents > 0 && (
-                <Text
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  style={{
-                    color: "#aaa",
-                    fontFamily: "Inter_300Light",
-                    fontSize: 14,
-                    marginTop: selectedIncomeCents > 0 ? 2 : 0,
-                  }}
-                >
-                  −{formatMoney(selectedExpenseCents)}
-                </Text>
-              )}
-            </View>
-          )}
-          <View
-            style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-              paddingHorizontal: 4,
+        <View style={{ height: carouselHeight, marginTop: -20 }}>
+          <ScrollView
+            ref={carouselRef}
+            horizontal
+            pagingEnabled
+            nestedScrollEnabled
+            showsHorizontalScrollIndicator={false}
+            style={{ width: chartWidth, height: carouselHeight }}
+            onMomentumScrollEnd={(event) => {
+              selectCarouselPage(
+                Math.round(event.nativeEvent.contentOffset.x / chartWidth) === 1 ? 1 : 0,
+              );
             }}
           >
-            <Text
-              style={{
-                color: MUTED,
-                fontFamily: font.regular,
-                fontSize: 12,
-              }}
-            >
-              Historial
-            </Text>
-            <Text
-              style={{
-                color: MUTED,
-                fontFamily: font.regular,
-                fontSize: 12,
-              }}
-            >
-              Hoy
-            </Text>
-            <Text
-              style={{
-                color: MUTED,
-                fontFamily: font.regular,
-                fontSize: 12,
-              }}
-            >
-              {horizonDays} días
-            </Text>
-          </View>
-        </View>
+            <View style={{ width: chartWidth, height: carouselHeight, justifyContent: "center" }}>
+                <View
+                  accessibilityLabel={`Gráfica de liquidez de los próximos ${horizonDays} días. Desliza para seleccionar una fecha.`}
+                  style={{
+                    marginTop: 10,
+                    height: 258,
+                  }}
+                  onTouchStart={(event) => {
+                    if (balanceCents !== null) selectAt(event.nativeEvent.locationX);
+                  }}
+                  onTouchMove={(event) => {
+                    if (balanceCents !== null) selectAt(event.nativeEvent.locationX);
+                  }}
+                >
+                  <Svg width={chartWidth} height={236}>
+                    <Line
+                      x1={chartPadding}
+                      x2={chartWidth - chartPadding}
+                      y1={baselineY}
+                      y2={baselineY}
+                      stroke="#c8c8c8"
+                      strokeWidth={1.5}
+                      strokeDasharray="1 10"
+                      strokeLinecap="round"
+                    />
+                    {balanceCents !== null && (
+                      <>
+                        <Path
+                          d={historyPath}
+                          stroke={INK}
+                          strokeWidth={3.5}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          fill="none"
+                        />
+                        <Path
+                          d={incomePath}
+                          stroke="#c6c6c6"
+                          strokeWidth={2.5}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          fill="none"
+                        />
+                        <Path
+                          d={expensePath}
+                          stroke="#a4a4a4"
+                          strokeWidth={2.5}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          fill="none"
+                        />
+                        <Path
+                          d={chartPath}
+                          stroke={INK}
+                          strokeWidth={3.5}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          fill="none"
+                        />
+                        <Line
+                          x1={selectedX}
+                          x2={selectedX}
+                          y1={28}
+                          y2={baselineY}
+                          stroke="#c5c5c5"
+                          strokeWidth={1}
+                          strokeDasharray="2 5"
+                        />
+                        <Circle
+                          cx={selectedX}
+                          cy={yForBalance(selectedBalance ?? 0)}
+                          r={5}
+                          fill={INK}
+                        />
+                      </>
+                    )}
+                  </Svg>
+                  {balanceCents !== null && (selectedIncomeCents > 0 || selectedExpenseCents > 0) && (
+                    <View
+                      pointerEvents="none"
+                      accessible
+                      accessibilityLabel={[
+                        selectedIncomeCents > 0 ? `Ingresos ${formatMoney(selectedIncomeCents)}` : null,
+                        selectedExpenseCents > 0 ? `Gastos ${formatMoney(selectedExpenseCents)}` : null,
+                      ].filter(Boolean).join(", ")}
+                      onLayout={(event) => setBadgeWidth(event.nativeEvent.layout.width)}
+                      style={{
+                        position: "absolute",
+                        top: 0,
+                        left: Math.max(0, Math.min(chartWidth - badgeWidth, selectedX - badgeWidth / 2)),
+                        alignItems: "flex-start",
+                        maxWidth: chartWidth,
+                        borderRadius: 999,
+                        backgroundColor: INK,
+                        paddingHorizontal: 12,
+                        paddingVertical: 6,
+                      }}
+                    >
+                      {selectedIncomeCents > 0 && (
+                        <Text
+                          numberOfLines={1}
+                          adjustsFontSizeToFit
+                          style={{ color: "#fff", fontFamily: "Inter_300Light", fontSize: 14 }}
+                        >
+                          +{formatMoney(selectedIncomeCents)}
+                        </Text>
+                      )}
+                      {selectedExpenseCents > 0 && (
+                        <Text
+                          numberOfLines={1}
+                          adjustsFontSizeToFit
+                          style={{
+                            color: "#aaa",
+                            fontFamily: "Inter_300Light",
+                            fontSize: 14,
+                            marginTop: selectedIncomeCents > 0 ? 2 : 0,
+                          }}
+                        >
+                          −{formatMoney(selectedExpenseCents)}
+                        </Text>
+                      )}
+                    </View>
+                  )}
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      paddingHorizontal: 4,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: MUTED,
+                        fontFamily: font.regular,
+                        fontSize: 12,
+                      }}
+                    >
+                      Historial
+                    </Text>
+                    <Text
+                      style={{
+                        color: MUTED,
+                        fontFamily: font.regular,
+                        fontSize: 12,
+                      }}
+                    >
+                      Hoy
+                    </Text>
+                    <Text
+                      style={{
+                        color: MUTED,
+                        fontFamily: font.regular,
+                        fontSize: 12,
+                      }}
+                    >
+                      {horizonDays} días
+                    </Text>
+                  </View>
+                </View>
 
-        <View
-          style={{
-            flexDirection: "row",
-            justifyContent: "center",
-            gap: 20,
-            marginTop: 7,
-          }}
-        >
-          {(
-            [
-              ["#101010", "Saldo"],
-              ["#c6c6c6", "Ingresos"],
-              ["#a4a4a4", "Gastos"],
-            ] as const
-          ).map(([color, label]) => (
-            <View
-              key={label}
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 5,
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "center",
+                    gap: 20,
+                    marginTop: 7,
+                  }}
+                >
+                  {(
+                    [
+                      ["#101010", "Saldo"],
+                      ["#c6c6c6", "Ingresos"],
+                      ["#a4a4a4", "Gastos"],
+                    ] as const
+                  ).map(([color, label]) => (
+                    <View
+                      key={label}
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 5,
+                      }}
+                    >
+                      <View
+                        style={{
+                          width: 15,
+                          height: 3,
+                          borderRadius: 2,
+                          backgroundColor: color,
+                        }}
+                      />
+                      <Text
+                        style={{
+                          color: MUTED,
+                          fontFamily: font.regular,
+                          fontSize: 11,
+                        }}
+                      >
+                        {label}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "center",
+                    gap: 12,
+                  marginTop: 12,
+                  }}
+                >
+                  {([7, 30, 60, 90] as const).map((days) => (
+                    <Pressable
+                      key={days}
+                      onPress={() => {
+                        setHorizonDays(days);
+                        setSelectedDay((current) => Math.min(current, days));
+                      }}
+                      style={{
+                        paddingHorizontal: 14,
+                        paddingVertical: 8,
+                        borderRadius: 9,
+                        backgroundColor:
+                          horizonDays === days ? "#e3e3e3" : "transparent",
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: horizonDays === days ? INK : MUTED,
+                          fontFamily: font.medium,
+                          fontSize: 12,
+                        }}
+                      >
+                        {days} días
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+
+            </View>
+            <View style={{ width: chartWidth, height: carouselHeight, justifyContent: "center" }}>
+                <AccountsHub
+                  accounts={ledger.accounts}
+                  cards={ledger.cards}
+                  balanceCents={balanceCents}
+                  onSelectAccount={(accountId) =>
+                    router.push({ pathname: '/accounts', params: { accountId } })
+                  }
+                  onSelectCard={(cardId) =>
+                    router.push({ pathname: '/cards', params: { cardId } })
+                  }
+                  onAdd={() => router.push('/accounts-and-cards')}
+                  onSimulate={() => router.push('/simulator')}
+                  onStatistics={() => router.push('/stats')}
+                  onHistory={() => router.push('/movements')}
+                  onRegisterMovement={() => router.push(
+                    ledger.accounts.length
+                      ? { pathname: '/movements', params: { create: '1' } }
+                      : '/accounts',
+                  )}
+                />
+            </View>
+          </ScrollView>
+        </View>
+        <View style={{ flexDirection: "row", justifyContent: "center", gap: 0, marginTop: 4 }}>
+          {([0, 1] as const).map((page) => (
+            <Pressable
+              key={page}
+              onPress={() => {
+                selectCarouselPage(page);
+                carouselRef.current?.scrollTo({ x: chartWidth * page, animated: true });
               }}
+              accessibilityRole="button"
+              accessibilityLabel={page === 0 ? "Mostrar gráfica" : "Mostrar cartera"}
+              accessibilityState={{ selected: carouselPage === page }}
+              style={{ width: 24, height: 24, alignItems: "center", justifyContent: "center" }}
             >
               <View
                 style={{
-                  width: 15,
-                  height: 3,
-                  borderRadius: 2,
-                  backgroundColor: color,
+                  width: 7,
+                  height: 7,
+                  borderRadius: 4,
+                  backgroundColor: carouselPage === page ? INK : "#c8c8c8",
                 }}
               />
-              <Text
-                style={{
-                  color: MUTED,
-                  fontFamily: font.regular,
-                  fontSize: 11,
-                }}
-              >
-                {label}
-              </Text>
-            </View>
-          ))}
-        </View>
-        <View
-          style={{
-            flexDirection: "row",
-            justifyContent: "center",
-            gap: 12,
-            marginTop: 18,
-          }}
-        >
-          {([7, 30, 60, 90] as const).map((days) => (
-            <Pressable
-              key={days}
-              onPress={() => {
-                setHorizonDays(days);
-                setSelectedDay((current) => Math.min(current, days));
-              }}
-              style={{
-                paddingHorizontal: 14,
-                paddingVertical: 8,
-                borderRadius: 9,
-                backgroundColor:
-                  horizonDays === days ? "#e3e3e3" : "transparent",
-              }}
-            >
-              <Text
-                style={{
-                  color: horizonDays === days ? INK : MUTED,
-                  fontFamily: font.medium,
-                  fontSize: 12,
-                }}
-              >
-                {days} días
-              </Text>
             </Pressable>
           ))}
         </View>
-
-        <AccountsHub
-          accounts={ledger.accounts}
-          cards={ledger.cards}
-          balanceCents={balanceCents}
-          onSelectAccount={(accountId) =>
-            router.push({ pathname: '/accounts', params: { accountId } })
-          }
-          onSelectCard={(cardId) =>
-            router.push({ pathname: '/cards', params: { cardId } })
-          }
-          onAdd={() => router.push('/accounts-and-cards')}
-          onSimulate={() => router.push('/simulator')}
-          onStatistics={() => router.push('/stats')}
-          onHistory={() => router.push('/movements')}
-          onRegisterMovement={() => router.push(
-            ledger.accounts.length
-              ? { pathname: '/movements', params: { create: '1' } }
-              : '/accounts',
-          )}
-        />
 
         <View style={{ marginTop: 35 }}>
           <ScheduledMovementsList
