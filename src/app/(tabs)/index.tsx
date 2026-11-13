@@ -372,7 +372,8 @@ export default function HomeTab() {
               );
             }}
           >
-            <View style={{ width: chartWidth, height: carouselHeight, justifyContent: "center" }}>
+            <View style={{ width: chartWidth, height: carouselHeight }}>
+              <View style={{ flex: 1, justifyContent: "center" }}>
                 <View
                   accessibilityLabel={`Gráfica de liquidez de los próximos ${horizonDays} días. Desliza para seleccionar una fecha.`}
                   style={{
@@ -531,13 +532,14 @@ export default function HomeTab() {
                     </Text>
                   </View>
                 </View>
+              </View>
 
                 <View
                   style={{
                     flexDirection: "row",
                     justifyContent: "center",
                     gap: 20,
-                    marginTop: 7,
+                    marginTop: 0,
                   }}
                 >
                   {(
@@ -580,7 +582,8 @@ export default function HomeTab() {
                     flexDirection: "row",
                     justifyContent: "center",
                     gap: 12,
-                  marginTop: 12,
+                    marginTop: 8,
+                    paddingBottom: 8,
                   }}
                 >
                   {([7, 30, 60, 90] as const).map((days) => (
