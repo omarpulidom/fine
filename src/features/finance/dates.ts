@@ -20,6 +20,17 @@ const MONTH_NAMES = [
   'Diciembre',
 ] as const
 
+const SHORT_MONTH_NAMES = [
+  'ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN',
+  'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC',
+] as const
+
+export function formatShortDateKey(dateKey: string): string {
+  if (!isDateKey(dateKey)) return dateKey
+  const [year, month, day] = dateKey.split('-').map(Number)
+  return `${day} ${SHORT_MONTH_NAMES[month - 1]} ${year}`
+}
+
 export function formatDateDisplay(date: Date): string {
   const day = date.getDate()
   const month = MONTH_NAMES[date.getMonth()]

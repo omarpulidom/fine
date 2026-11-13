@@ -16,12 +16,15 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { AppBottomSheet } from '@/components/ui/AppBottomSheet'
 import { DateField } from '@/components/ui/DateField'
+import { cutoffForMonth, previousCutoffMonth } from '@/features/finance/billingCalendar'
 import { type CardDesignId, cardDesigns } from '@/features/finance/cardDesigns'
-import { addDaysKey, isDateKey, localDateKey } from '@/features/finance/dates'
+import { addDaysKey, addMonthsKey, formatShortDateKey, isDateKey, localDateKey } from '@/features/finance/dates'
 import { allocateInstallments } from '@/features/finance/installments'
 import {
   addCardActivity,
+  activateAutomaticBilling,
   type CardActivity,
+  confirmCycleStatement,
   createBillingCycle,
   createCreditCard,
   deleteCardActivity,
@@ -92,6 +95,25 @@ function Field({
   )
 }
 
+function CutoffDayInput({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  return (
+    <View style={{ width: 105, marginTop: 20 }}>
+      <Text style={{ fontFamily: medium, fontSize: 13, color: MUTED }}>Día de corte</Text>
+      <TextInput
+        value={value}
+        onChangeText={(text) => onChange(text.replace(/\D/g, '').slice(0, 2))}
+        placeholder='Ej. 12'
+        placeholderTextColor='#bbb'
+        keyboardType='number-pad'
+        maxLength={2}
+        accessibilityLabel='Día de corte, del 1 al 31'
+        style={{ borderBottomWidth: 1, borderBottomColor: '#ddd', paddingVertical: 10,
+          fontFamily: regular, fontSize: 16, color: INK }}
+      />
+    </View>
+  )
+}
+
 export default function CardsScreen() {
   const router = useRouter()
   const { width: screenWidth } = useWindowDimensions()
@@ -129,8 +151,8 @@ export default function CardsScreen() {
     create === '1' ? (ledger.accounts[0]?.id ?? '') : '',
   )
   const [scheduledDate, setScheduledDate] = useState('')
-  const [paymentToAvoidInterest, setPaymentToAvoidInterest] = useState('')
-  const [minimumPayment, setMinimumPayment] = useState('')
+  const [useAutomaticPayment, setUseAutomaticPayment] = useState(false)
+  const [showCyclePicker, setShowCyclePicker] = useState(false)
   const [error, setError] = useState('')
   const todayKey = localDateKey(new Date())
   const selectedCard = ledger.cards.find((card) => card.id === selectedCardId)
@@ -174,8 +196,8 @@ export default function CardsScreen() {
         ledger.cycles.find((cycle) => cycle.id === cycleId)?.dueDate ??
         '',
     )
-    setPaymentToAvoidInterest('')
-    setMinimumPayment('')
+    setUseAutomaticPayment(false)
+    setShowCyclePicker(false)
     setSourceAccountId(
       ledger.cards.find((card) => card.id === cardId)?.paymentSourceAccountId ??
         ledger.accounts[0]?.id ??
@@ -186,31 +208,28 @@ export default function CardsScreen() {
       const card = ledger.cards.find((item) => item.id === cardId)
       setName(card?.name ?? '')
       setCutoffDay(card ? String(card.cutoffDay) : '')
+      setDueDate(card?.billingRule?.anchorDueDate ?? '')
     }
     if (nextMode === 'plan') {
       const cycle = ledger.cycles.find((item) => item.id === cycleId)
+      setBilled(cycle?.openingStatementCents
+        ? formatMoneyInput((cycle.openingStatementCents / 100).toFixed(2))
+        : '')
       setAmount(
-        cycle?.scheduledAmountCents
+        cycle?.paymentMode === 'automatic'
+          ? formatMoneyInput((statementAmountCents(ledger, cycleId) / 100).toFixed(2))
+          : cycle?.scheduledAmountCents
           ? formatMoneyInput((cycle.scheduledAmountCents / 100).toFixed(2))
           : '',
       )
+      setUseAutomaticPayment(cycle?.paymentMode === 'automatic')
       setDueDate(cycle?.dueDate ?? '')
-      setPaymentToAvoidInterest(
-        cycle?.paymentToAvoidInterestCents === undefined
-          ? ''
-          : formatMoneyInput((cycle.paymentToAvoidInterestCents / 100).toFixed(2)),
-      )
-      setMinimumPayment(
-        cycle?.minimumPaymentCents === undefined
-          ? ''
-          : formatMoneyInput((cycle.minimumPaymentCents / 100).toFixed(2)),
-      )
     }
   }
 
   function readCardDetails() {
-    const debtCents = parseAmount(debt)
-    const billedCents = parseAmount(billed)
+    const debtCents = debt.trim() ? parseAmount(debt) : 0
+    const billedCents = billed.trim() ? parseAmount(billed) : 0
     const day = Number(cutoffDay)
     if (
       !name.trim() ||
@@ -221,9 +240,9 @@ export default function CardsScreen() {
       billedCents === null ||
       billedCents > debtCents ||
       !sourceAccountId ||
-      (billedCents > 0 && (!isDateKey(cutoffDate) || !isDateKey(dueDate)))
+      !isDateKey(dueDate) || dueDate <= todayKey
     ) {
-      throw new Error('Revisa nombre, corte, deuda, saldo facturado y fechas.')
+      throw new Error('Revisa nombre, corte, deuda, próximo pago y fecha límite futura.')
     }
     return {
       day,
@@ -249,6 +268,13 @@ export default function CardsScreen() {
         const { debtCents, billedCents, day } = readCardDetails()
         if (!selectedDesignId) throw new Error('Selecciona un banco o «Otro banco».')
         const id = newCardId()
+        let cutoffMonth = previousCutoffMonth(dueDate, day)
+        if (billedCents > 0) {
+          while (cutoffForMonth(cutoffMonth, day) > todayKey) {
+            cutoffMonth = addMonthsKey(`${cutoffMonth}-01`, -1).slice(0, 7)
+          }
+        }
+        const initialCutoff = cutoffForMonth(cutoffMonth, day)
         setLedger(
           createCreditCard(
             {
@@ -260,25 +286,31 @@ export default function CardsScreen() {
               unbilledOpeningCents: debtCents - billedCents,
               paymentSourceAccountId: sourceAccountId,
               createdDate: todayKey,
+              billingRule: { anchorCutoffMonth: cutoffMonth, anchorDueDate: dueDate },
             },
-            billedCents > 0
-              ? {
+              {
                   id: newCycleId(),
                   cardId: id,
-                  cutoffDate,
+                  cutoffDate: initialCutoff,
                   dueDate,
                   openingStatementCents: billedCents,
                   scheduledAmountCents: 0,
                   paidAmountCents: 0,
-                }
-              : null,
+                  automatic: true,
+                  paymentMode: 'automatic',
+                  dueDateConfirmed: true,
+                },
           ),
         )
       } else if (mode === 'settings') {
         if (!selectedCard) throw new Error('Selecciona una tarjeta.')
-        setLedger(
-          updateCreditCardSettings(selectedCard.id, name, Number(cutoffDay), sourceAccountId),
-        )
+        if (!selectedCard.billingRule && (!isDateKey(dueDate) || dueDate <= todayKey)) {
+          throw new Error('Confirma la próxima fecha límite de pago.')
+        }
+        updateCreditCardSettings(selectedCard.id, name, Number(cutoffDay), sourceAccountId)
+        setLedger(!selectedCard.billingRule && dueDate
+          ? activateAutomaticBilling(selectedCard.id, dueDate)
+          : getLedger())
       } else if (mode === 'cycle') {
         if (!selectedCard || !isDateKey(cutoffDate) || !isDateKey(dueDate))
           throw new Error('Ingresa fechas válidas.')
@@ -333,30 +365,33 @@ export default function CardsScreen() {
         )
       } else if (mode === 'plan') {
         const cents = amount.trim() ? parseAmount(amount) : 0
-        const ppngi = paymentToAvoidInterest.trim()
-          ? parseAmount(paymentToAvoidInterest)
-          : undefined
-        const minimum = minimumPayment.trim() ? parseAmount(minimumPayment) : undefined
         if (
           !selectedCycle ||
           cents === null ||
-          (cents > 0 && (!isDateKey(scheduledDate) || scheduledDate <= todayKey))
+          (!useAutomaticPayment && cents > 0 && (!isDateKey(scheduledDate) || scheduledDate <= todayKey))
         ) {
           throw new Error('Ingresa un importe y una fecha futura válidos.')
         }
-        if (ppngi === null || minimum === null) throw new Error('Importes informativos inválidos.')
-        setLedger(
-          scheduleCyclePayment(
-            selectedCycle.id,
+        if (selectedCycle.automatic) {
+          const openingCents = billed.trim() ? parseAmount(billed) : 0
+          if (openingCents === null) throw new Error('Saldo pendiente inválido.')
+          const nextStatement = statementAmountCents(ledger, selectedCycle.id)
+            - selectedCycle.openingStatementCents + openingCents
+          if (dueDate <= selectedCycle.cutoffDate ||
+              (!useAutomaticPayment && cents > nextStatement)) {
+            throw new Error('Revisa el saldo y la fecha de este corte.')
+          }
+          confirmCycleStatement(selectedCycle.id, openingCents, dueDate)
+        }
+        if (useAutomaticPayment) {
+          setLedger(getLedger())
+        } else {
+          setLedger(scheduleCyclePayment(selectedCycle.id,
             cents > 0 ? scheduledDate : undefined,
             cents,
             dueDate,
-            {
-              paymentToAvoidInterestCents: ppngi,
-              minimumPaymentCents: minimum,
-            },
-          ),
-        )
+          ))
+        }
       } else if (mode === 'reassign') {
         if (!selectedActivity || !selectedCycleId) throw new Error('Selecciona un ciclo.')
         setLedger(
@@ -525,6 +560,18 @@ export default function CardsScreen() {
           const cardCycles = ledger.cycles
             .filter((cycle) => cycle.cardId === card.id)
             .sort((a, b) => b.cutoffDate.localeCompare(a.cutoffDate))
+          const purchaseCycle = [...cardCycles].reverse().find((cycle) => cycle.cutoffDate >= todayKey)
+          const paymentCycle = [...cardCycles].reverse().find((cycle) =>
+            cycle.dueDate >= todayKey &&
+            statementAmountCents(ledger, cycle.id) > cycle.paidAmountCents)
+            ?? [...cardCycles].reverse().find((cycle) => cycle.dueDate >= todayKey)
+          const nextPaymentCycle = [...cardCycles]
+            .filter((cycle) => cycle.dueDate >= todayKey &&
+              (cycle.paymentMode === 'automatic'
+                ? statementAmountCents(ledger, cycle.id)
+                : cycle.scheduledAmountCents) > cycle.paidAmountCents)
+            .sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0]
+          const nextCycle = nextPaymentCycle ?? purchaseCycle ?? paymentCycle
           const activity = ledger.cardActivity
             .filter((item) => item.cardId === card.id)
             .sort((a, b) => b.effectiveDate.localeCompare(a.effectiveDate))
@@ -608,24 +655,20 @@ export default function CardsScreen() {
                       Editar
                     </Text>
                   </Pressable>
-                  <Pressable onPress={() => open('cycle', card.id)}>
-                    <Text
-                      style={{
-                        fontFamily: medium,
-                        color: INK,
-                        fontSize: 13,
-                      }}
-                    >
-                      + Ciclo
-                    </Text>
-                  </Pressable>
+                  {!card.billingRule && (
+                    <Pressable onPress={() => open('cycle', card.id)}>
+                      <Text style={{ fontFamily: medium, color: INK, fontSize: 13 }}>
+                        + Ciclo
+                      </Text>
+                    </Pressable>
+                  )}
                   <Pressable
-                    onPress={() => cardCycles.length && open('purchase', card.id, cardCycles[0].id)}
+                    onPress={() => purchaseCycle && open('purchase', card.id, purchaseCycle.id)}
                   >
                     <Text
                       style={{
                         fontFamily: medium,
-                        color: cardCycles.length ? INK : MUTED,
+                        color: purchaseCycle ? INK : MUTED,
                         fontSize: 13,
                       }}
                     >
@@ -633,12 +676,12 @@ export default function CardsScreen() {
                     </Text>
                   </Pressable>
                   <Pressable
-                    onPress={() => cardCycles.length && open('payment', card.id, cardCycles[0].id)}
+                    onPress={() => paymentCycle && open('payment', card.id, paymentCycle.id)}
                   >
                     <Text
                       style={{
                         fontFamily: medium,
-                        color: cardCycles.length ? INK : MUTED,
+                        color: paymentCycle ? INK : MUTED,
                         fontSize: 13,
                       }}
                     >
@@ -647,97 +690,33 @@ export default function CardsScreen() {
                   </Pressable>
                 </View>
               </View>
-              {cardCycles.map((cycle) => {
-                const statement = statementAmountCents(ledger, cycle.id)
-                const pending = Math.max(0, cycle.scheduledAmountCents - cycle.paidAmountCents)
-                const installmentShares = activity.flatMap(
-                  (item) =>
-                    item.installments
-                      ?.filter((part) => part.cycleId === cycle.id)
-                      .map((part) => ({
-                        id: item.id,
-                        label: item.description || 'Compra a MSI',
-                        amountCents: part.amountCents,
-                      })) ?? [],
-                )
-                return (
-                  <Pressable
-                    key={cycle.id}
-                    onPress={() => open('plan', card.id, cycle.id)}
-                    style={{
-                      marginTop: 8,
-                      padding: 16,
-                      backgroundColor: '#fff',
-                      borderRadius: 12,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        fontFamily: medium,
-                        color: INK,
-                        fontSize: 14,
-                      }}
-                    >
-                      Corte {cycle.cutoffDate}
+              {nextCycle && (
+                <Pressable
+                  onPress={() => open('plan', card.id, nextCycle.id)}
+                  accessibilityRole='button'
+                  accessibilityLabel={`Editar ciclo de corte ${formatShortDateKey(nextCycle.cutoffDate)}`}
+                  style={{ marginTop: 8, padding: 16, backgroundColor: '#fff',
+                    borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 12 }}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontFamily: medium, color: MUTED, fontSize: 12 }}>
+                      {nextCycle.cutoffDate < todayKey ? 'Próximo pago' : 'Siguiente corte'}
                     </Text>
-                    <Text
-                      style={{
-                        fontFamily: regular,
-                        color: MUTED,
-                        fontSize: 12,
-                        marginTop: 4,
-                      }}
-                    >
-                      Vence {cycle.dueDate} ·{' '}
-                      {cycle.cutoffDate > todayKey ? 'Importe del ciclo' : 'Facturado'}{' '}
-                      {formatMoney(statement)} · Pagado {formatMoney(cycle.paidAmountCents)}
+                    <Text style={{ fontFamily: semibold, color: INK, fontSize: 22, marginTop: 4 }}>
+                      {formatMoney(Math.max(0,
+                        (nextCycle.paymentMode === 'automatic'
+                          ? statementAmountCents(ledger, nextCycle.id)
+                          : nextCycle.scheduledAmountCents) - nextCycle.paidAmountCents))}
                     </Text>
-                    {installmentShares.map((share) => (
-                      <Text
-                        key={share.id}
-                        style={{
-                          fontFamily: regular,
-                          color: MUTED,
-                          fontSize: 12,
-                          marginTop: 4,
-                        }}
-                      >
-                        MSI · {share.label} · {formatMoney(share.amountCents)}
-                      </Text>
-                    ))}
-                    {(cycle.paymentToAvoidInterestCents !== undefined ||
-                      cycle.minimumPaymentCents !== undefined) && (
-                      <Text
-                        style={{
-                          fontFamily: regular,
-                          color: MUTED,
-                          fontSize: 12,
-                          marginTop: 4,
-                        }}
-                      >
-                        {cycle.paymentToAvoidInterestCents !== undefined
-                          ? `PPNGI ${formatMoney(cycle.paymentToAvoidInterestCents)} `
-                          : ''}
-                        {cycle.minimumPaymentCents !== undefined
-                          ? `Mínimo ${formatMoney(cycle.minimumPaymentCents)}`
-                          : ''}
-                      </Text>
-                    )}
-                    <Text
-                      style={{
-                        fontFamily: medium,
-                        color: pending ? INK : MUTED,
-                        fontSize: 12,
-                        marginTop: 7,
-                      }}
-                    >
-                      {pending
-                        ? `Pago previsto ${formatMoney(pending)} · ${cycle.scheduledDate}`
-                        : 'Toca para programar un pago'}
+                    <Text style={{ fontFamily: regular, color: MUTED, fontSize: 12, marginTop: 4 }}>
+                      Corte {formatShortDateKey(nextCycle.cutoffDate)} · Pago {formatShortDateKey(nextCycle.paymentMode === 'automatic'
+                        ? nextCycle.dueDate : nextCycle.scheduledDate ?? nextCycle.dueDate)}
+                      {nextCycle.automatic && !nextCycle.dueDateConfirmed ? ' estimado' : ''}
                     </Text>
-                  </Pressable>
-                )
-              })}
+                  </View>
+                  <Feather name='edit-2' size={17} color={MUTED} />
+                </Pressable>
+              )}
               {activity.map((item) => (
                 <View
                   key={item.id}
@@ -775,7 +754,7 @@ export default function CardsScreen() {
                         marginTop: 3,
                       }}
                     >
-                      {item.effectiveDate} ·{' '}
+                      {formatShortDateKey(item.effectiveDate)} ·{' '}
                       {item.installments
                         ? `${item.installments.length} MSI · Cambiar plan`
                         : item.type === 'purchase'
@@ -809,10 +788,6 @@ export default function CardsScreen() {
       <AppBottomSheet
         visible={mode !== null}
         onClose={() => setMode(null)}
-        snapPoints={[
-          '84%',
-          '94%',
-        ]}
       >
         <View>
           <Text
@@ -835,19 +810,36 @@ export default function CardsScreen() {
                     : mode === 'payment'
                       ? 'Pago realizado'
                       : mode === 'plan'
-                        ? 'Programar pago'
+                        ? 'Editar corte'
                         : 'Cambiar ciclo'}
           </Text>
           {mode === 'card' && cardStep === 'details' && (
             <>
               <Label>Nombre</Label>
               <Field value={name} onChangeText={setName} placeholder='Ej. Tarjeta principal' />
-              <Label>Día de corte (1–31)</Label>
-              <Field value={cutoffDay} onChangeText={setCutoffDay} placeholder='12' />
-              <Label>Deuda actual</Label>
-              <Field value={debt} onChangeText={setDebt} placeholder='0.00' decimal />
-              <Label>Saldo facturado pendiente</Label>
-              <Field value={billed} onChangeText={setBilled} placeholder='0.00' decimal />
+              <View style={{ flexDirection: 'row', gap: 16, alignItems: 'flex-end' }}>
+                <CutoffDayInput value={cutoffDay} onChange={setCutoffDay} />
+                <DateField
+                  label='Fecha límite'
+                  value={dueDate}
+                  onChange={setDueDate}
+                  minimumDate={addDaysKey(todayKey, 1)}
+                  compact
+                  style={{ flex: 1 }}
+                />
+              </View>
+              <View style={{ flexDirection: 'row', gap: 16 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ height: 54, paddingTop: 19, fontFamily: medium,
+                    fontSize: 13, color: MUTED, textAlignVertical: 'bottom' }}>Deuda actual</Text>
+                  <Field value={debt} onChangeText={setDebt} placeholder='0.00' decimal />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ height: 54, paddingTop: 19, fontFamily: medium,
+                    fontSize: 13, color: MUTED, textAlignVertical: 'bottom' }}>Deuda del corte anterior</Text>
+                  <Field value={billed} onChangeText={setBilled} placeholder='0.00' decimal />
+                </View>
+              </View>
               <Text
                 style={{
                   marginTop: 6,
@@ -856,20 +848,8 @@ export default function CardsScreen() {
                   fontSize: 12,
                 }}
               >
-                La diferencia es deuda aún no facturada.
+                La deuda actual incluye la del corte anterior. Esta última se proyecta en la fecha límite; el resto queda para próximos cortes.
               </Text>
-              <DateField
-                label='Último corte, si hay saldo facturado'
-                value={cutoffDate}
-                onChange={setCutoffDate}
-                maximumDate={todayKey}
-              />
-              <DateField
-                label='Fecha límite'
-                value={dueDate}
-                onChange={setDueDate}
-                minimumDate={cutoffDate ? addDaysKey(cutoffDate, 1) : undefined}
-              />
             </>
           )}
           {mode === 'card' && cardStep === 'design' && (
@@ -988,8 +968,16 @@ export default function CardsScreen() {
             <>
               <Label>Nombre</Label>
               <Field value={name} onChangeText={setName} placeholder='Nombre de tarjeta' />
-              <Label>Día habitual de corte</Label>
-              <Field value={cutoffDay} onChangeText={setCutoffDay} placeholder='12' />
+              <CutoffDayInput value={cutoffDay} onChange={setCutoffDay} />
+              {!selectedCard?.billingRule && (
+                <>
+                  <DateField label='Fecha límite' value={dueDate} onChange={setDueDate}
+                    minimumDate={addDaysKey(todayKey, 1)} />
+                  <Text style={{ fontFamily: regular, color: MUTED, fontSize: 12, marginTop: 8 }}>
+                    Al guardar, se crearán ciclos futuros. Los ciclos y pagos que ya registraste se conservarán.
+                  </Text>
+                </>
+              )}
             </>
           )}
           {mode === 'cycle' && (
@@ -1080,7 +1068,7 @@ export default function CardsScreen() {
                         fontFamily: medium,
                       }}
                     >
-                      {cycle.cutoffDate}
+                      {formatShortDateKey(cycle.cutoffDate)}
                     </Text>
                   </Pressable>
                 ))}
@@ -1175,6 +1163,27 @@ export default function CardsScreen() {
           )}
           {mode === 'plan' && (
             <>
+              <Pressable onPress={() => setShowCyclePicker((current) => !current)}
+                style={{ marginTop: 12, alignSelf: 'flex-start' }}>
+                <Text style={{ fontFamily: medium, fontSize: 13, color: INK }}>
+                  {showCyclePicker ? 'Ocultar ciclos' : 'Elegir otro ciclo'}
+                </Text>
+              </Pressable>
+              {showCyclePicker && (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}
+                  style={{ marginTop: 10 }}>
+                  {[...cycles].reverse().map((cycle) => (
+                    <Pressable key={cycle.id} onPress={() => open('plan', selectedCardId, cycle.id)}
+                      style={{ marginRight: 8, paddingHorizontal: 10, paddingVertical: 8,
+                        borderRadius: 8, backgroundColor: cycle.id === selectedCycleId ? INK : '#f3f3f3' }}>
+                      <Text style={{ fontFamily: medium, fontSize: 12,
+                        color: cycle.id === selectedCycleId ? '#fff' : INK }}>
+                        {formatShortDateKey(cycle.cutoffDate)}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              )}
               <Text
                 style={{
                   marginTop: 10,
@@ -1190,36 +1199,39 @@ export default function CardsScreen() {
                 {formatMoney(selectedCycle?.paidAmountCents ?? 0)}
               </Text>
               <DateField
-                label='Fecha límite confirmada'
+                label='Fecha límite de pago'
                 value={dueDate}
                 onChange={setDueDate}
                 minimumDate={
                   selectedCycle?.cutoffDate ? addDaysKey(selectedCycle.cutoffDate, 1) : undefined
                 }
               />
-              <Label>Monto total previsto (0 para quitar)</Label>
-              <Field value={amount} onChangeText={setAmount} placeholder='0.00' decimal />
-              <DateField
-                label='Fecha prevista'
-                value={scheduledDate}
-                onChange={setScheduledDate}
-                minimumDate={addDaysKey(todayKey, 1)}
-                clearable
-              />
-              <Label>Pago para no generar intereses (informativo)</Label>
-              <Field
-                value={paymentToAvoidInterest}
-                onChangeText={setPaymentToAvoidInterest}
-                placeholder='Opcional'
-                decimal
-              />
-              <Label>Pago mínimo (informativo)</Label>
-              <Field
-                value={minimumPayment}
-                onChangeText={setMinimumPayment}
-                placeholder='Opcional'
-                decimal
-              />
+              {selectedCycle?.automatic && (
+                <>
+                  <Label>Deuda anterior en este corte</Label>
+                  <Field value={billed} onChangeText={setBilled} placeholder='0.00' decimal />
+                  <Text style={{ fontFamily: regular, color: MUTED, fontSize: 12, marginTop: 5 }}>
+                    Sin asignar: {formatMoney((selectedCard?.unbilledOpeningCents ?? 0) +
+                      (selectedCycle?.openingStatementCents ?? 0))}
+                  </Text>
+                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 16 }}>
+                    {([['automatic', 'Proyección automática'], ['manual', 'Pago manual']] as const).map(([value, title]) => (
+                      <Pressable key={value} onPress={() => setUseAutomaticPayment(value === 'automatic')}
+                        style={{ padding: 10, borderRadius: 9, backgroundColor: useAutomaticPayment === (value === 'automatic') ? INK : '#f3f3f3' }}>
+                        <Text style={{ fontFamily: medium, color: useAutomaticPayment === (value === 'automatic') ? '#fff' : INK, fontSize: 12 }}>{title}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </>
+              )}
+              {!useAutomaticPayment && (
+                <>
+                  <Label>Monto previsto (0 para quitar)</Label>
+                  <Field value={amount} onChangeText={setAmount} placeholder='0.00' decimal />
+                  <DateField label='Fecha prevista' value={scheduledDate} onChange={setScheduledDate}
+                    minimumDate={addDaysKey(todayKey, 1)} clearable />
+                </>
+              )}
             </>
           )}
           {!!error && (
