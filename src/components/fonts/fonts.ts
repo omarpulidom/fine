@@ -1,4 +1,5 @@
 import {
+  Inter_300Light,
   Inter_400Regular,
   Inter_500Medium,
   Inter_600SemiBold,
@@ -6,6 +7,7 @@ import {
 } from '@expo-google-fonts/inter'
 
 export const AppFonts = {
+  Inter_300Light,
   Inter_400Regular,
   Inter_500Medium,
   Inter_600SemiBold,

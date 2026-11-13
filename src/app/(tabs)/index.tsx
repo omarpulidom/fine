@@ -58,6 +58,7 @@ export default function HomeTab() {
   const [editingScheduled, setEditingScheduled] =
     useState<ScheduledMovement | null>(null);
   const [selectedDay, setSelectedDay] = useState(0);
+  const [badgeWidth, setBadgeWidth] = useState(80);
   const [horizonDays, setHorizonDays] = useState<7 | 30 | 60 | 90>(30);
   const [today, setToday] = useState(() => new Date());
   useFocusEffect(
@@ -139,6 +140,22 @@ export default function HomeTab() {
     today.getMonth(),
     today.getDate() + selectedDay,
   );
+  const selectedDateKey = localDateKey(selectedDate);
+  const selectedProjection = selectedDay > 0 ? projection[selectedDay] : undefined;
+  const previousProjection = selectedDay > 0 ? projection[selectedDay - 1] : undefined;
+  const selectedIncomeCents = selectedProjection
+    ? selectedProjection.incomeCents - (previousProjection?.incomeCents ?? 0)
+    : ledger.completedMovements
+        .filter((movement) => movement.effectiveDate === selectedDateKey && movement.type === "income")
+        .reduce((sum, movement) => sum + movement.amountCents, 0);
+  const selectedExpenseCents = selectedProjection
+    ? selectedProjection.expenseCents - (previousProjection?.expenseCents ?? 0)
+    : ledger.completedMovements
+        .filter((movement) => movement.effectiveDate === selectedDateKey && movement.type === "expense")
+        .reduce((sum, movement) => sum + movement.amountCents, 0) +
+      ledger.cardActivity
+        .filter((activity) => activity.effectiveDate === selectedDateKey && activity.type === "payment")
+        .reduce((sum, activity) => sum + activity.amountCents, 0);
 
   const chartPadding = 12;
   const todayX = chartPadding + (chartWidth - chartPadding * 2) * 0.38;
@@ -433,6 +450,52 @@ export default function HomeTab() {
               </>
             )}
           </Svg>
+          {balanceCents !== null && (selectedIncomeCents > 0 || selectedExpenseCents > 0) && (
+            <View
+              pointerEvents="none"
+              accessible
+              accessibilityLabel={[
+                selectedIncomeCents > 0 ? `Ingresos ${formatMoney(selectedIncomeCents)}` : null,
+                selectedExpenseCents > 0 ? `Gastos ${formatMoney(selectedExpenseCents)}` : null,
+              ].filter(Boolean).join(", ")}
+              onLayout={(event) => setBadgeWidth(event.nativeEvent.layout.width)}
+              style={{
+                position: "absolute",
+                top: 0,
+                left: Math.max(0, Math.min(chartWidth - badgeWidth, selectedX - badgeWidth / 2)),
+                alignItems: "flex-start",
+                maxWidth: chartWidth,
+                borderRadius: 999,
+                backgroundColor: INK,
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+              }}
+            >
+              {selectedIncomeCents > 0 && (
+                <Text
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  style={{ color: "#fff", fontFamily: "Inter_300Light", fontSize: 14 }}
+                >
+                  +{formatMoney(selectedIncomeCents)}
+                </Text>
+              )}
+              {selectedExpenseCents > 0 && (
+                <Text
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  style={{
+                    color: "#aaa",
+                    fontFamily: "Inter_300Light",
+                    fontSize: 14,
+                    marginTop: selectedIncomeCents > 0 ? 2 : 0,
+                  }}
+                >
+                  −{formatMoney(selectedExpenseCents)}
+                </Text>
+              )}
+            </View>
+          )}
           <View
             style={{
               flexDirection: "row",
@@ -513,22 +576,6 @@ export default function HomeTab() {
             </View>
           ))}
         </View>
-        {selectedDay > 0 && projection[selectedDay] && (
-          <Text
-            style={{
-              color: MUTED,
-              fontFamily: font.regular,
-              fontSize: 12,
-              textAlign: "center",
-              marginTop: 9,
-            }}
-          >
-            Acumulado: +{formatMoney(projection[selectedDay].incomeCents)}{" "}
-            ingresos ·{" −"}
-            {formatMoney(projection[selectedDay].expenseCents)} gastos
-          </Text>
-        )}
-
         <View
           style={{
             flexDirection: "row",
