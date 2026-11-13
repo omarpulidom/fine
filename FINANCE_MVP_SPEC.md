@@ -4,7 +4,7 @@
 
 ## 1. Objetivo del producto
 
-Construir una aplicación móvil para visualizar **la liquidez futura por día**, a partir de los **saldos actuales** y de **movimientos existentes o explícitamente programados**. La pregunta principal que debe responder es: **«¿Cuánto dinero tendré disponible en una fecha específica?»**.
+Construir una aplicación móvil para visualizar **la liquidez futura por día**, a partir de los **saldos actuales**, movimientos programados y obligaciones conocidas de tarjetas configuradas. La pregunta principal que debe responder es: **«¿Cuánto dinero tendré disponible en una fecha específica?»**.
 
 La app no busca predecir hábitos ni estimar consumos futuros. Es una proyección determinista de los movimientos conocidos.
 
@@ -47,7 +47,7 @@ La gráfica de liquidez es el componente central:
 
 - Mostrar saldo disponible de hoy.
 - Curva de saldo proyectado por día.
-- En la proyección, tres trazos desde el saldo de hoy: saldo total en negro, saldo más ingresos acumulados en gris claro y saldo menos gastos acumulados en gris más oscuro. Los gastos incluyen pagos de tarjeta programados explícitamente. Un badge compacto muestra solo los ingresos y gastos no nulos del día elegido.
+- En la proyección, tres trazos desde el saldo de hoy: saldo total en negro, saldo más ingresos acumulados en gris claro y saldo menos gastos acumulados en gris más oscuro. Los gastos incluyen pagos de tarjeta previstos por el calendario o programados manualmente. Un badge compacto muestra solo los ingresos y gastos no nulos del día elegido.
 - Permitir tocar/arrastrar sobre la curva para consultar **fecha + saldo**. Un arrastre iniciado en el área de la gráfica selecciona fechas sin mover el carrusel; fuera de la gráfica se puede deslizar entre sus páginas, y el desplazamiento vertical de la pantalla sigue disponible.
 - Mostrar cambios únicamente en días con movimientos previstos; una línea horizontal en periodos sin eventos.
 - Distinguir tramo histórico/actual y tramo proyectado. El ancho del tramo histórico crece con los días disponibles hasta un límite; con poco historial, la gráfica comienza cerca del borde izquierdo.
@@ -100,7 +100,7 @@ saldo_proyectado(d) = saldo_disponible_hoy
 
 ### 5.1 Configuración de una tarjeta
 
-La creación usa dos pasos en el mismo bottom sheet: primero se capturan nombre, corte, deuda, saldo facturado, fechas y cuenta de pago; después se elige el banco en un carrusel de diseños locales. El diseño elegido se guarda con la tarjeta y se muestra en la cartera de Inicio. BBVA, Nu y Plata usan imágenes incluidas en la app; «Otro banco» y las tarjetas creadas antes de esta selección conservan el diseño genérico.
+La creación usa dos pasos en el mismo bottom sheet: primero nombre, día de corte en un campo numérico compacto, próxima fecha límite exacta, «Deuda actual», «Deuda del corte anterior» (opcional) y cuenta de pago, organizados en pocas filas; después se elige el banco en un carrusel de diseños locales. «Deuda actual» incluye el saldo pendiente del corte anterior. No se pide la fecha del último corte: se calcula con el día habitual y la próxima fecha límite. El diseño elegido se guarda con la tarjeta y se muestra en la cartera de Inicio. BBVA, Nu y Plata usan imágenes incluidas en la app; «Otro banco» y las tarjetas creadas antes de esta selección conservan el diseño genérico.
 
 Campos sugeridos:
 
@@ -108,13 +108,17 @@ Campos sugeridos:
 - Institución/emisor (opcional).
 - Límite de crédito (opcional para calcular liquidez).
 - Día habitual de corte.
-- Fecha límite de pago / regla de calendario (con posibilidad de **corrección manual** por ciclo).
+- Próxima fecha límite exacta, usada como ancla para estimar vencimientos mensuales posteriores; cada ciclo permite **corrección manual**.
 - Cuenta bancaria desde la que se prevé pagar.
 - Saldo total de deuda actual.
 - **Saldo facturado pendiente** del último estado de cuenta y su fecha límite.
 - Compras posteriores al último corte aún no facturadas, cuando proceda.
 
 **Importante:** no asumir que «deuda actual», «saldo al corte», «pago mínimo» y «pago para no generar intereses» son equivalentes.
+
+El día de corte conserva su valor habitual (1–31). Cuando un mes no tenga ese día, usar su último día disponible solo para ese mes; el siguiente vuelve al día habitual. Se crean 48 ciclos mensuales móviles. Las tarjetas antiguas conservan sus ciclos y pagos; pueden activar el calendario en «Editar» al confirmar la próxima fecha límite. No se convierten automáticamente.
+
+En la pantalla de cada tarjeta se muestra solo una tarjeta resumida del próximo ciclo relevante: el siguiente pago pendiente o, si no lo hay, el siguiente corte. La proyección automática se aplica sin pedir confirmación. Tocar el resumen abre la edición de fecha o importe; desde ahí se puede elegir otro ciclo. No mostrar una lista permanente de los 48 ciclos ni una acción «Confirmar corte».
 
 ### 5.2 Registro de compras
 
@@ -145,12 +149,12 @@ Estas fechas son **ejemplos**, no una regla universal: la fecha límite exacta d
 Cada ciclo debe poder representar:
 
 - **Saldo facturado**.
-- **Pago para no generar intereses (PPNGI)**, si se conoce.
-- **Pago mínimo**, si se conoce (informativo).
 - **Monto programado a pagar** y **fecha programada**.
 - **Pagos realizados**, que reducen el saldo pendiente de la obligación.
 
-La gráfica utiliza el **monto y la fecha del pago programado**. Cuando hay pago real, este afecta el saldo disponible y reduce/reemplaza la obligación pendiente para impedir doble descuento.
+El formulario de corte no pide PPNGI ni pago mínimo. Si ya existen en datos guardados, se conservan al editar el ciclo.
+
+La gráfica utiliza el importe pendiente del ciclo en su fecha límite estimada o confirmada cuando está activa la proyección automática. Un pago manual puede sustituirla o desactivarla para ese ciclo. Cuando hay pago real, este afecta el saldo disponible y reduce/reemplaza la obligación pendiente para impedir doble descuento.
 
 No modelar automáticamente intereses, comisiones o cargos por mora en el MVP: introducirlos solo como movimientos registrados cuando sean conocidos.
 
@@ -165,20 +169,15 @@ Para inicializar una tarjeta ya utilizada, pedir al menos:
 
 Comprobar que los importes sean coherentes y **no duplicar** saldos históricos con compras nuevas. Si faltan datos, permitir introducir una obligación inicial editable sin inventar una distribución por ciclos.
 
-### 5.6 Estrategia de pago predeterminada — decisión pendiente
+### 5.6 Estrategia de pago predeterminada
 
-Se discutieron dos alternativas:
-
-- **A. Automática (propuesta)**: sugerir pagar el saldo facturado completo en la fecha límite de cada ciclo; permitir modificar monto y fecha por ciclo.
-- **B. Manual**: proyectar pagos únicamente cuando el usuario los programe expresamente.
-
-**No dar por decidida A o B todavía.** Diseñar el motor para aceptar pagos programados explícitos; implementar la política predeterminada una vez confirmada. Si se usa A, no confundir saldo facturado con PPNGI en presencia de MSI u otros productos.
+Las tarjetas con calendario automático proyectan el saldo pendiente del último estado de cuenta en la próxima fecha límite exacta. Las compras registradas se proyectan en el ciclo asignado; en MSI se proyecta solo la cuota de cada ciclo. La deuda inicial que exceda el saldo facturado queda sin fecha de pago hasta confirmar un corte posterior. En cada ciclo se puede corregir la fecha, confirmar deuda anterior adicional o elegir un importe y fecha manuales, incluido cero para desactivar la proyección. Los pagos reales reducen el importe todavía proyectado. Los ciclos antiguos conservan su programación manual.
 
 ### 5.7 MSI — parte del MVP
 
 Una compra de $6,000 a 6 MSI debe registrar deuda de $6,000, pero distribuir en los ciclos correspondientes seis mensualidades de $1,000 (salvo diferencias por redondeo o condiciones de la institución). La liquidez disminuye únicamente en las fechas de pago programadas de los estados de cuenta. No asumir de manera universal cuándo comienza a facturarse la primera mensualidad.
 
-Al registrar una compra MSI, pedir **número de mensualidades** y **primer ciclo de facturación**. Generar las mensualidades solo en ciclos que el usuario haya configurado o confirmado; si falta un ciclo, solicitar sus fechas antes de proyectar el pago. La suma exacta de las mensualidades debe coincidir con el precio total, incluyendo el ajuste de centavos por redondeo.
+Al registrar una compra MSI, pedir **número de mensualidades** y **primer ciclo de facturación**. En tarjetas con calendario automático, distribuir en los ciclos generados; el primer ciclo puede corregirse manualmente según el banco. En tarjetas sin calendario, se requieren ciclos configurados. La suma exacta de las mensualidades debe coincidir con el precio total, incluyendo el ajuste de centavos por redondeo.
 
 El plan de MSI se vincula a la compra original y a cada ciclo. Una mensualidad incrementa el importe del ciclo correspondiente; **no** vuelve a aumentar la deuda total de la tarjeta. Los pagos programados o realizados de esos ciclos siguen las reglas de la sección 5.4. Permitir corregir el primer ciclo o el número de meses antes de registrar pagos vinculados.
 
@@ -320,7 +319,7 @@ Las estadísticas se **derivan** de movimientos realizados; no necesitan otra fu
 
 ## 9. Criterios de aceptación
 
-- [ ] Si no hay movimientos programados, la proyección futura permanece constante.
+- [ ] Si no hay movimientos programados ni obligaciones conocidas de tarjetas, la proyección futura permanece constante.
 - [ ] Un ingreso futuro aparece en la gráfica desde la fecha programada, no antes.
 - [ ] Un gasto futuro de débito aparece desde su fecha programada, no antes.
 - [ ] Una compra de crédito no disminuye la liquidez bancaria el día de la compra.
@@ -357,6 +356,8 @@ Separar al menos:
 7. Interfaz de captura, gráfica, simulador y estadísticas.
 
 Los formularios y paneles deslizables desde la parte inferior deben usar **`@gorhom/bottom-sheet`**, reutilizando el proveedor ya instalado en la app. Los diálogos breves de confirmación pueden seguir usando alertas nativas.
+Los bottom sheets se ajustan al contenido de cada estado, con un máximo de pantalla y desplazamiento cuando el formulario lo requiere; no reservan alturas porcentuales fijas para estados cortos.
+Las fechas almacenadas como `AAAA-MM-DD` se muestran en listas y resúmenes como `5 NOV 2026`; el formato de almacenamiento no se expone al usuario.
 
 Preferir operaciones reproducibles; la interfaz no debe recalcular por su cuenta reglas monetarias. **No añadir ni ejecutar tests en esta etapa**, según la preferencia actual del usuario.
 
@@ -364,6 +365,6 @@ Preferir operaciones reproducibles; la interfaz no debe recalcular por su cuenta
 
 1. Primero inspecciona la estructura del repositorio y sus convenciones.
 2. Usa este documento como **especificación funcional**, no como autorización para rehacer arquitectura existente.
-3. Mantén pendiente la política automática/manual de pagos; **MSI, simulador y estadísticas sencillas sí forman parte del MVP**.
+3. Aplica la política de pagos automáticos y corrección por ciclo de la sección 5.6; **MSI, simulador y estadísticas sencillas sí forman parte del MVP**.
 4. Implementa por partes: datos y reglas → proyección → tarjetas y MSI → simulador → estadísticas → UI.
 5. No agregues pronósticos de hábitos, análisis con IA ni sincronización bancaria.
