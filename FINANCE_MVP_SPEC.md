@@ -30,6 +30,8 @@ La app no busca predecir hábitos ni estimar consumos futuros. Es una proyecció
 8. **Compras a meses sin intereses (MSI)**: distribuir una compra de crédito entre ciclos confirmados sin duplicar la deuda ni los pagos.
 9. **Estadísticas sencillas**: ingresos, gastos y diferencia neta de movimientos realizados, por mes y con totales claros.
 
+Las cuentas se crean en dos pasos: nombre y saldo, seguido de un carrusel con diseños de débito BBVA, Nu y Plata, además de «Otro banco» y «Efectivo». La selección determina si la cuenta es bancaria o efectivo y, cuando hay imagen, aparece en la cartera de Inicio.
+
 ### Posibles funciones posteriores, no bloqueantes para el MVP
 
 - Presupuestos, metas de ahorro, préstamos y estadísticas avanzadas por categorías.
@@ -50,8 +52,8 @@ La gráfica de liquidez es el componente central:
 - Mostrar próximos ingresos, gastos y pagos programados en una lista cronológica con filtro de todos, ingresos o gastos. Cada fila separa título e importe de fecha y acciones.
 - Acceso inmediato a **Añadir movimiento**.
 - Debajo de la fecha y el saldo principal, mostrar un carrusel horizontal de altura compartida que se ajusta al ancho de la cartera: primera página con la gráfica, leyenda y selector de periodos; segunda página con la cartera y los accesos. La fecha y el saldo principal permanecen fuera del carrusel, y la lista inferior no cambia de posición al deslizar. Al mostrar la cartera, la fecha seleccionada vuelve a hoy.
-- En la segunda página, la cartera negra ocupa todo el ancho disponible y mantiene un perfil bajo, con la liquidez total y una lengüeta sobre dos tarjetas decorativas. Debajo hay cuatro accesos circulares pequeños sin texto visible, alineados a la izquierda en una fila: simular compra, estadísticas, historial y registrar movimiento. Los accesos tienen etiquetas de accesibilidad.
-- Al tocar la cartera o su lengüeta, mantenerla fija y elevar las dos tarjetas originales por detrás de la lengüeta, sin sacarlas por completo ni desplazar el contenido inferior. La lengüeta forma parte de la cartera y nunca abre una cuenta. Cada tarjeta disponible abre su pantalla de gestión enfocada; las tarjetas de crédito muestran su deuda por separado y no se suman a la liquidez. El botón «+» aparece con la animación y abre la pantalla «Cuentas y tarjetas» para elegir si agregar una cuenta o tarjeta de crédito.
+- En la segunda página, la cartera negra ocupa todo el ancho disponible y mantiene un perfil bajo, con la liquidez total y una lengüeta sobre hasta tres tarjetas reales. Una tarjeta queda arriba; dos conservan la separación actual; tres usan una separación menor para caber detrás de la lengüeta. Debajo hay cuatro accesos circulares pequeños sin texto visible, alineados a la izquierda en una fila: simular compra, estadísticas, historial y registrar movimiento. Los accesos tienen etiquetas de accesibilidad.
+- Al tocar la cartera o su lengüeta, mantenerla fija y elevar las tarjetas visibles por detrás de la lengüeta, sin sacarlas por completo ni desplazar el contenido inferior. La lengüeta forma parte de la cartera y nunca abre una cuenta. Cada tarjeta disponible abre su pantalla de gestión enfocada; las tarjetas de crédito muestran su deuda por separado y no se suman a la liquidez. El botón «+» aparece con la animación y abre la pantalla «Cuentas y tarjetas» para elegir si agregar una cuenta o tarjeta de crédito.
 - Debajo del importe de la cartera, mostrar la cantidad real de cuentas y tarjetas en lugar de repetir «Saldo disponible»; si no hay cuentas, mostrar «Añadir primera cuenta».
 
 **Definición de liquidez para esta pantalla:** dinero disponible en efectivo y cuentas bancarias; una deuda con tarjeta **no** disminuye automáticamente esa liquidez hasta el día de su pago proyectado o efectivo.
@@ -95,6 +97,8 @@ saldo_proyectado(d) = saldo_disponible_hoy
 ## 5. Tarjetas de crédito
 
 ### 5.1 Configuración de una tarjeta
+
+La creación usa dos pasos en el mismo bottom sheet: primero se capturan nombre, corte, deuda, saldo facturado, fechas y cuenta de pago; después se elige el banco en un carrusel de diseños locales. El diseño elegido se guarda con la tarjeta y se muestra en la cartera de Inicio. BBVA, Nu y Plata usan imágenes incluidas en la app; «Otro banco» y las tarjetas creadas antes de esta selección conservan el diseño genérico.
 
 Campos sugeridos:
 

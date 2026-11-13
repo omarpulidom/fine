@@ -1,4 +1,6 @@
 import { storageMMKV } from '@/lib/mmkv/stores'
+import type { AccountDesignId } from './accountDesigns'
+import type { CardDesignId } from './cardDesigns'
 import { isDateKey, localDateKey } from './dates'
 import { allocateInstallments, type Installment } from './installments'
 
@@ -9,6 +11,7 @@ export type LiquidAccount = {
   id: string
   name: string
   type: 'cash' | 'bank'
+  accountDesignId?: AccountDesignId
   balanceCents: number
   asOfDate?: string
 }
@@ -28,6 +31,7 @@ export type CompletedMovement = {
 export type CreditCard = {
   id: string
   name: string
+  cardDesignId?: CardDesignId
   cutoffDay: number
   currentDebtCents: number
   unbilledOpeningCents: number

@@ -2,9 +2,22 @@ import { Feather } from '@expo/vector-icons'
 import { BottomSheetTextInput as TextInput } from '@gorhom/bottom-sheet'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useState } from 'react'
-import { Pressable, ScrollView, Text, View } from 'react-native'
+import {
+  Image,
+  Keyboard,
+  Pressable,
+  ScrollView,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { AppBottomSheet } from '@/components/ui/AppBottomSheet'
+import {
+  type AccountDesignId,
+  accountDesigns,
+  getAccountDesign,
+} from '@/features/finance/accountDesigns'
 import { localDateKey } from '@/features/finance/dates'
 import {
   getLedger,
@@ -23,6 +36,8 @@ const semibold = 'Inter_600SemiBold'
 
 export default function AccountsScreen() {
   const router = useRouter()
+  const { width: screenWidth } = useWindowDimensions()
+  const designPageWidth = screenWidth - 48
   const { accountId, create } = useLocalSearchParams<{
     accountId?: string
     create?: string
@@ -31,8 +46,9 @@ export default function AccountsScreen() {
   const [editing, setEditing] = useState<LiquidAccount | null | undefined>(
     create === '1' ? null : undefined,
   )
+  const [accountStep, setAccountStep] = useState<'details' | 'design'>('details')
+  const [selectedDesignId, setSelectedDesignId] = useState<AccountDesignId | null>(null)
   const [name, setName] = useState('')
-  const [type, setType] = useState<LiquidAccount['type']>('bank')
   const [balance, setBalance] = useState('')
   const [error, setError] = useState('')
   const visibleAccounts = accountId
@@ -43,10 +59,24 @@ export default function AccountsScreen() {
 
   function open(account: LiquidAccount | null) {
     setEditing(account)
+    setAccountStep('details')
+    setSelectedDesignId(
+      account ? (account.type === 'cash' ? 'cash' : (account.accountDesignId ?? 'other')) : null,
+    )
     setName(account?.name ?? '')
-    setType(account?.type ?? 'bank')
     setBalance(account ? formatMoneyInput((account.balanceCents / 100).toFixed(2)) : '')
     setError('')
+  }
+
+  function nextAccountStep() {
+    const cents = parseAmount(balance)
+    if (!name.trim() || cents === null) {
+      setError('Escribe un nombre y un saldo válido.')
+      return
+    }
+    Keyboard.dismiss()
+    setError('')
+    setAccountStep('design')
   }
 
   function save() {
@@ -55,16 +85,25 @@ export default function AccountsScreen() {
       setError('Escribe un nombre y un saldo válido.')
       return
     }
-    setLedger(
-      upsertAccount({
-        id: editing?.id ?? newAccountId(),
-        name: name.trim(),
-        type,
-        balanceCents: cents,
-        asOfDate: editing?.asOfDate ?? localDateKey(new Date()),
-      }),
-    )
-    setEditing(undefined)
+    if (!selectedDesignId) {
+      setError('Selecciona un banco o «Efectivo».')
+      return
+    }
+    try {
+      setLedger(
+        upsertAccount({
+          id: editing?.id ?? newAccountId(),
+          name: name.trim(),
+          type: selectedDesignId === 'cash' ? 'cash' : 'bank',
+          accountDesignId: selectedDesignId,
+          balanceCents: cents,
+          asOfDate: editing?.asOfDate ?? localDateKey(new Date()),
+        }),
+      )
+      setEditing(undefined)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'No se pudo guardar la cuenta.')
+    }
   }
 
   return (
@@ -168,7 +207,9 @@ export default function AccountsScreen() {
                   marginTop: 4,
                 }}
               >
-                {account.type === 'cash' ? 'Efectivo' : 'Banco / débito'}
+                {account.type === 'cash'
+                  ? 'Efectivo'
+                  : (getAccountDesign(account.accountDesignId)?.label ?? 'Banco / débito')}
               </Text>
             </View>
             <Text
@@ -217,92 +258,186 @@ export default function AccountsScreen() {
               fontSize: 21,
             }}
           >
-            {editing ? 'Editar cuenta' : 'Nueva cuenta'}
+            {accountStep === 'design'
+              ? 'Elige tu cuenta'
+              : editing
+                ? 'Editar cuenta'
+                : 'Nueva cuenta'}
           </Text>
-          <Text
-            style={{
-              marginTop: 24,
-              fontFamily: medium,
-              fontSize: 13,
-              color: MUTED,
-            }}
-          >
-            Nombre
-          </Text>
-          <TextInput
-            value={name}
-            onChangeText={setName}
-            placeholder='Ej. Cuenta principal'
-            placeholderTextColor='#bbb'
-            style={{
-              borderBottomWidth: 1,
-              borderBottomColor: '#ddd',
-              fontFamily: regular,
-              fontSize: 16,
-              paddingVertical: 11,
-              color: INK,
-            }}
-          />
-          <View
-            style={{
-              flexDirection: 'row',
-              gap: 10,
-              marginTop: 24,
-            }}
-          >
-            {(
-              [
-                'bank',
-                'cash',
-              ] as const
-            ).map((value) => (
-              <Pressable
-                key={value}
-                onPress={() => setType(value)}
+          {accountStep === 'details' && (
+            <>
+              <Text
                 style={{
-                  flex: 1,
-                  paddingVertical: 12,
-                  borderRadius: 10,
-                  backgroundColor: type === value ? INK : '#f3f3f3',
-                  alignItems: 'center',
+                  marginTop: 24,
+                  fontFamily: medium,
+                  fontSize: 13,
+                  color: MUTED,
                 }}
               >
-                <Text
-                  style={{
-                    fontFamily: medium,
-                    color: type === value ? '#fff' : INK,
-                  }}
-                >
-                  {value === 'bank' ? 'Banco / débito' : 'Efectivo'}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-          <Text
-            style={{
-              marginTop: 24,
-              fontFamily: medium,
-              fontSize: 13,
-              color: MUTED,
-            }}
-          >
-            Saldo actual
-          </Text>
-          <TextInput
-            value={balance}
-            onChangeText={(value) => setBalance(formatMoneyInput(value))}
-            keyboardType='decimal-pad'
-            placeholder='0.00'
-            placeholderTextColor='#bbb'
-            style={{
-              borderBottomWidth: 1,
-              borderBottomColor: '#ddd',
-              fontFamily: medium,
-              fontSize: 30,
-              paddingVertical: 10,
-              color: INK,
-            }}
-          />
+                Nombre
+              </Text>
+              <TextInput
+                value={name}
+                onChangeText={setName}
+                placeholder='Ej. Cuenta principal'
+                placeholderTextColor='#bbb'
+                style={{
+                  borderBottomWidth: 1,
+                  borderBottomColor: '#ddd',
+                  fontFamily: regular,
+                  fontSize: 16,
+                  paddingVertical: 11,
+                  color: INK,
+                }}
+              />
+              <Text
+                style={{
+                  marginTop: 24,
+                  fontFamily: medium,
+                  fontSize: 13,
+                  color: MUTED,
+                }}
+              >
+                Saldo actual
+              </Text>
+              <TextInput
+                value={balance}
+                onChangeText={(value) => setBalance(formatMoneyInput(value))}
+                keyboardType='decimal-pad'
+                placeholder='0.00'
+                placeholderTextColor='#bbb'
+                style={{
+                  borderBottomWidth: 1,
+                  borderBottomColor: '#ddd',
+                  fontFamily: medium,
+                  fontSize: 30,
+                  paddingVertical: 10,
+                  color: INK,
+                }}
+              />
+            </>
+          )}
+          {accountStep === 'design' && (
+            <View
+              style={{
+                marginTop: 16,
+              }}
+            >
+              <Text
+                style={{
+                  fontFamily: regular,
+                  fontSize: 14,
+                  color: MUTED,
+                  marginBottom: 14,
+                }}
+              >
+                Desliza o toca una opción para elegir cómo se verá en tu cartera.
+              </Text>
+              <ScrollView
+                horizontal
+                pagingEnabled
+                nestedScrollEnabled
+                showsHorizontalScrollIndicator={false}
+                contentOffset={{
+                  x:
+                    Math.max(
+                      0,
+                      accountDesigns.findIndex((design) => design.id === selectedDesignId),
+                    ) * designPageWidth,
+                  y: 0,
+                }}
+                onMomentumScrollEnd={(event) => {
+                  const index = Math.round(event.nativeEvent.contentOffset.x / designPageWidth)
+                  const design = accountDesigns[index]
+                  if (design) {
+                    setSelectedDesignId(design.id)
+                    setError('')
+                  }
+                }}
+              >
+                {accountDesigns.map((design) => (
+                  <View
+                    key={design.id}
+                    style={{
+                      width: designPageWidth,
+                      alignItems: 'center',
+                      paddingHorizontal: 12,
+                      paddingVertical: 12,
+                    }}
+                  >
+                    <View
+                      style={{
+                        width: '100%',
+                        aspectRatio: 817 / 511,
+                        borderRadius: 16,
+                        backgroundColor: '#fff',
+                        shadowColor: '#000',
+                        shadowOffset: {
+                          width: 0,
+                          height: 6,
+                        },
+                        shadowOpacity: 0.12,
+                        shadowRadius: 14,
+                        elevation: 5,
+                      }}
+                    >
+                      <Pressable
+                        onPress={() => {
+                          setSelectedDesignId(design.id)
+                          setError('')
+                        }}
+                        accessibilityRole='button'
+                        accessibilityLabel={`Seleccionar ${design.label}`}
+                        accessibilityState={{
+                          selected: selectedDesignId === design.id,
+                        }}
+                        style={{
+                          flex: 1,
+                          borderRadius: 16,
+                          overflow: 'hidden',
+                        }}
+                      >
+                        {design.image ? (
+                          <Image
+                            source={design.image}
+                            resizeMode='cover'
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                            }}
+                          />
+                        ) : (
+                          <View
+                            style={{
+                              flex: 1,
+                              backgroundColor: design.id === 'cash' ? '#f1f1f1' : '#e8e8e8',
+                              justifyContent: 'space-between',
+                              padding: 22,
+                            }}
+                          >
+                            <Feather
+                              name={design.id === 'cash' ? 'dollar-sign' : 'credit-card'}
+                              size={30}
+                              color={INK}
+                            />
+                            <Text
+                              style={{
+                                fontFamily: medium,
+                                color: INK,
+                                fontSize: 18,
+                              }}
+                            >
+                              {design.id === 'cash' ? 'Efectivo' : 'Mi cuenta'}
+                            </Text>
+                          </View>
+                        )}
+                      </Pressable>
+                    </View>
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
+          )}
           {!!error && (
             <Text
               style={{
@@ -322,7 +457,14 @@ export default function AccountsScreen() {
             }}
           >
             <Pressable
-              onPress={() => setEditing(undefined)}
+              onPress={() => {
+                if (accountStep === 'design') {
+                  setAccountStep('details')
+                  setError('')
+                } else {
+                  setEditing(undefined)
+                }
+              }}
               style={{
                 flex: 1,
                 height: 50,
@@ -336,11 +478,11 @@ export default function AccountsScreen() {
                   color: MUTED,
                 }}
               >
-                Cancelar
+                {accountStep === 'design' ? 'Atrás' : 'Cancelar'}
               </Text>
             </Pressable>
             <Pressable
-              onPress={save}
+              onPress={accountStep === 'details' ? nextAccountStep : save}
               style={{
                 flex: 1,
                 height: 50,
@@ -356,7 +498,7 @@ export default function AccountsScreen() {
                   color: '#fff',
                 }}
               >
-                Guardar
+                {accountStep === 'details' ? 'Siguiente' : 'Guardar'}
               </Text>
             </Pressable>
           </View>

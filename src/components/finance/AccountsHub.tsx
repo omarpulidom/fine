@@ -1,6 +1,6 @@
 import { Feather } from '@expo/vector-icons'
 import { useState } from 'react'
-import { Pressable, Text, useWindowDimensions, View } from 'react-native'
+import { Image, Pressable, Text, useWindowDimensions, View } from 'react-native'
 import Animated, {
   ReduceMotion,
   type SharedValue,
@@ -9,6 +9,8 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated'
 import Svg, { Path } from 'react-native-svg'
+import { type AccountDesignId, getAccountDesign } from '@/features/finance/accountDesigns'
+import { type CardDesignId, getCardDesign } from '@/features/finance/cardDesigns'
 import type { CreditCard, LiquidAccount } from '@/features/finance/ledger'
 import { formatMoney } from '@/features/finance/money'
 
@@ -31,6 +33,8 @@ type WalletEntry = {
   name: string
   amountCents: number
   icon: 'briefcase' | 'dollar-sign' | 'credit-card'
+  cardDesignId?: CardDesignId
+  accountDesignId?: AccountDesignId
 }
 
 const ink = '#101010'
@@ -75,6 +79,10 @@ function WalletInstrumentCard({
   progress: SharedValue<number>
   onPress: () => void
 }) {
+  const cardImage =
+    entry.kind === 'card'
+      ? getCardDesign(entry.cardDesignId)?.image
+      : getAccountDesign(entry.accountDesignId)?.image
   const animatedStyle = useAnimatedStyle(
     () => ({
       height: width * (index === 0 ? 0.4 : 0.38) + 42 * progress.value,
@@ -103,6 +111,7 @@ function WalletInstrumentCard({
           zIndex: index + 2,
           backgroundColor: color,
           borderRadius: 15,
+          overflow: 'hidden',
         },
         animatedStyle,
       ]}
@@ -118,7 +127,22 @@ function WalletInstrumentCard({
           padding: 10,
         }}
       >
-        <Feather name={entry.icon} size={index === 0 ? 16 : 15} color={iconColor} />
+        {cardImage ? (
+          <Image
+            source={cardImage}
+            resizeMode='cover'
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: width - 24,
+              height: ((width - 24) * 511) / 817,
+              borderRadius: 15,
+            }}
+          />
+        ) : (
+          <Feather name={entry.icon} size={index === 0 ? 16 : 15} color={iconColor} />
+        )}
       </Pressable>
     </Animated.View>
   )
@@ -144,8 +168,8 @@ export function AccountsHub({
   const actionSize = getActionSize(walletWidth)
   const actionGap = Math.min(20, (walletWidth - actionSize * 4) / 3)
   const walletHeight = walletWidth * walletHeightRatio
-  const card = cards[0]
-  const account = accounts[0]
+  const visibleCards = cards.slice(accounts.length ? -2 : -3)
+  const visibleAccounts = accounts.slice(-(3 - visibleCards.length))
   const productSummary = [
     accounts.length ? `${accounts.length} ${accounts.length === 1 ? 'cuenta' : 'cuentas'}` : null,
     cards.length ? `${cards.length} ${cards.length === 1 ? 'tarjeta' : 'tarjetas'}` : null,
@@ -153,23 +177,29 @@ export function AccountsHub({
     .filter(Boolean)
     .join(' · ')
   const visibleEntries: WalletEntry[] = [
-    {
-      id: card?.id ?? '',
-      kind: 'card',
-      name: card?.name ?? 'Tarjeta',
-      amountCents: card?.currentDebtCents ?? 0,
-      icon: 'credit-card',
-    },
-    {
-      id: account?.id ?? '',
-      kind: 'account',
-      name: account?.name ?? 'Cuenta',
-      amountCents: account?.balanceCents ?? 0,
-      icon: 'briefcase',
-    },
+    ...visibleCards.map(
+      (card): WalletEntry => ({
+        id: card.id,
+        kind: 'card',
+        name: card.name,
+        amountCents: card.currentDebtCents,
+        icon: 'credit-card',
+        cardDesignId: card.cardDesignId,
+      }),
+    ),
+    ...visibleAccounts.map(
+      (account): WalletEntry => ({
+        id: account.id,
+        kind: 'account',
+        name: account.name,
+        amountCents: account.balanceCents,
+        icon: account.type === 'cash' ? 'dollar-sign' : 'briefcase',
+        accountDesignId: account.accountDesignId,
+      }),
+    ),
   ]
-  const extraCount = accounts.length + cards.length - Number(!!account) - Number(!!card)
-  const frontTop = walletWidth * 0.33
+  const extraCount = accounts.length + cards.length - visibleEntries.length
+  const frontTop = walletWidth * 0.36
   const addStyle = useAnimatedStyle(() => ({
     opacity: progress.value,
     transform: [
@@ -285,10 +315,18 @@ export function AccountsHub({
             key={`${entry.kind}-${entry.id}`}
             entry={entry}
             index={index}
-            color={index === 0 ? '#7c87bf' : '#f5f5f5'}
+            color={index === 0 ? '#7c87bf' : index === 1 ? '#f5f5f5' : '#e7e7e7'}
             iconColor={index === 0 ? '#fff' : ink}
-            baseTop={index === 0 ? 10 : walletWidth * 0.15}
-            lift={index === 0 ? 72 : 28}
+            baseTop={
+              visibleEntries.length === 3
+                ? index === 0
+                  ? 10
+                  : walletWidth * index * 0.115
+                : index === 0
+                  ? 10
+                  : walletWidth * 0.18
+            }
+            lift={visibleEntries.length === 3 && index === 1 ? 50 : index === 0 ? 72 : 28}
             width={walletWidth}
             liftSpace={liftSpace}
             expanded={expanded}

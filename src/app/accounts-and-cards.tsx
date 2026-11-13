@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router'
 import { useCallback, useState } from 'react'
 import { Pressable, ScrollView, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { getAccountDesign } from '@/features/finance/accountDesigns'
 import { getLedger } from '@/features/finance/ledger'
 import { formatMoney } from '@/features/finance/money'
 
@@ -173,7 +174,7 @@ export default function AccountsAndCardsScreen() {
         {ledger.accounts.map((account) =>
           choice(
             account.name,
-            `${account.type === 'cash' ? 'Efectivo' : 'Banco / débito'} · ${formatMoney(account.balanceCents)}`,
+            `${account.type === 'cash' ? 'Efectivo' : (getAccountDesign(account.accountDesignId)?.label ?? 'Banco / débito')} · ${formatMoney(account.balanceCents)}`,
             'briefcase',
             () =>
               router.push({

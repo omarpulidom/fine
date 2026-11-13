@@ -3,10 +3,20 @@ import { BottomSheetTextInput as TextInput } from '@gorhom/bottom-sheet'
 import { useFocusEffect } from '@react-navigation/native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useCallback, useState } from 'react'
-import { Alert, Pressable, ScrollView, Text, View } from 'react-native'
+import {
+  Alert,
+  Image,
+  Keyboard,
+  Pressable,
+  ScrollView,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { AppBottomSheet } from '@/components/ui/AppBottomSheet'
 import { DateField } from '@/components/ui/DateField'
+import { type CardDesignId, cardDesigns } from '@/features/finance/cardDesigns'
 import { addDaysKey, isDateKey, localDateKey } from '@/features/finance/dates'
 import { allocateInstallments } from '@/features/finance/installments'
 import {
@@ -83,6 +93,8 @@ function Field({
 
 export default function CardsScreen() {
   const router = useRouter()
+  const { width: screenWidth } = useWindowDimensions()
+  const designPageWidth = screenWidth - 48
   const { cardId: focusedCardId, create } = useLocalSearchParams<{
     cardId?: string
     create?: string
@@ -96,6 +108,8 @@ export default function CardsScreen() {
   const [mode, setMode] = useState<FormMode>(
     create === '1' && ledger.accounts.length ? 'card' : null,
   )
+  const [cardStep, setCardStep] = useState<'details' | 'design'>('details')
+  const [selectedDesignId, setSelectedDesignId] = useState<CardDesignId | null>(null)
   const [selectedCardId, setSelectedCardId] = useState('')
   const [selectedCycleId, setSelectedCycleId] = useState('')
   const [selectedActivity, setSelectedActivity] = useState<CardActivity | null>(null)
@@ -138,6 +152,8 @@ export default function CardsScreen() {
     activity: CardActivity | null = null,
   ) {
     setMode(nextMode)
+    setCardStep('details')
+    setSelectedDesignId(null)
     setSelectedCardId(cardId)
     setSelectedCycleId(cycleId)
     setSelectedActivity(activity)
@@ -191,31 +207,53 @@ export default function CardsScreen() {
     }
   }
 
+  function readCardDetails() {
+    const debtCents = parseAmount(debt)
+    const billedCents = parseAmount(billed)
+    const day = Number(cutoffDay)
+    if (
+      !name.trim() ||
+      !Number.isInteger(day) ||
+      day < 1 ||
+      day > 31 ||
+      debtCents === null ||
+      billedCents === null ||
+      billedCents > debtCents ||
+      !sourceAccountId ||
+      (billedCents > 0 && (!isDateKey(cutoffDate) || !isDateKey(dueDate)))
+    ) {
+      throw new Error('Revisa nombre, corte, deuda, saldo facturado y fechas.')
+    }
+    return {
+      day,
+      debtCents,
+      billedCents,
+    }
+  }
+
+  function nextCardStep() {
+    try {
+      readCardDetails()
+      Keyboard.dismiss()
+      setError('')
+      setCardStep('design')
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Revisa los datos de la tarjeta.')
+    }
+  }
+
   function save() {
     try {
       if (mode === 'card') {
-        const debtCents = parseAmount(debt)
-        const billedCents = parseAmount(billed)
-        const day = Number(cutoffDay)
-        if (
-          !name.trim() ||
-          !Number.isInteger(day) ||
-          day < 1 ||
-          day > 31 ||
-          debtCents === null ||
-          billedCents === null ||
-          billedCents > debtCents ||
-          !sourceAccountId ||
-          (billedCents > 0 && (!isDateKey(cutoffDate) || !isDateKey(dueDate)))
-        ) {
-          throw new Error('Revisa nombre, corte, deuda, saldo facturado y fechas.')
-        }
+        const { debtCents, billedCents, day } = readCardDetails()
+        if (!selectedDesignId) throw new Error('Selecciona un banco o «Otro banco».')
         const id = newCardId()
         setLedger(
           createCreditCard(
             {
               id,
               name: name.trim(),
+              cardDesignId: selectedDesignId,
               cutoffDay: day,
               currentDebtCents: debtCents,
               unbilledOpeningCents: debtCents - billedCents,
@@ -739,7 +777,9 @@ export default function CardsScreen() {
             }}
           >
             {mode === 'card'
-              ? 'Nueva tarjeta'
+              ? cardStep === 'details'
+                ? 'Nueva tarjeta'
+                : 'Elige tu banco'
               : mode === 'settings'
                 ? 'Editar tarjeta'
                 : mode === 'cycle'
@@ -752,7 +792,7 @@ export default function CardsScreen() {
                         ? 'Programar pago'
                         : 'Cambiar ciclo'}
           </Text>
-          {mode === 'card' && (
+          {mode === 'card' && cardStep === 'details' && (
             <>
               <Label>Nombre</Label>
               <Field value={name} onChangeText={setName} placeholder='Ej. Tarjeta principal' />
@@ -786,6 +826,118 @@ export default function CardsScreen() {
               />
             </>
           )}
+          {mode === 'card' && cardStep === 'design' && (
+            <View
+              style={{
+                marginTop: 16,
+              }}
+            >
+              <Text
+                style={{
+                  fontFamily: regular,
+                  fontSize: 14,
+                  color: MUTED,
+                  marginBottom: 14,
+                }}
+              >
+                Desliza o toca una tarjeta para elegir cómo se verá en tu cartera.
+              </Text>
+              <ScrollView
+                horizontal
+                pagingEnabled
+                nestedScrollEnabled
+                showsHorizontalScrollIndicator={false}
+                onMomentumScrollEnd={(event) => {
+                  const index = Math.round(event.nativeEvent.contentOffset.x / designPageWidth)
+                  const design = cardDesigns[index]
+                  if (design) {
+                    setSelectedDesignId(design.id)
+                    setError('')
+                  }
+                }}
+              >
+                {cardDesigns.map((design) => {
+                  const selected = selectedDesignId === design.id
+                  return (
+                    <View
+                      key={design.id}
+                      style={{
+                        width: designPageWidth,
+                        alignItems: 'center',
+                        paddingHorizontal: 12,
+                        paddingVertical: 12,
+                      }}
+                    >
+                      <View
+                        style={{
+                          width: '100%',
+                          aspectRatio: 817 / 511,
+                          borderRadius: 16,
+                          backgroundColor: '#fff',
+                          shadowColor: '#000',
+                          shadowOffset: {
+                            width: 0,
+                            height: 6,
+                          },
+                          shadowOpacity: 0.12,
+                          shadowRadius: 14,
+                          elevation: 5,
+                        }}
+                      >
+                        <Pressable
+                          onPress={() => {
+                            setSelectedDesignId(design.id)
+                            setError('')
+                          }}
+                          accessibilityRole='button'
+                          accessibilityLabel={`Seleccionar ${design.bank}`}
+                          accessibilityState={{
+                            selected,
+                          }}
+                          style={{
+                            flex: 1,
+                            borderRadius: 16,
+                            overflow: 'hidden',
+                          }}
+                        >
+                          {design.image ? (
+                            <Image
+                              source={design.image}
+                              resizeMode='cover'
+                              style={{
+                                width: '100%',
+                                height: '100%',
+                              }}
+                            />
+                          ) : (
+                            <View
+                              style={{
+                                flex: 1,
+                                backgroundColor: '#e8e8e8',
+                                justifyContent: 'space-between',
+                                padding: 22,
+                              }}
+                            >
+                              <Feather name='credit-card' size={30} color={INK} />
+                              <Text
+                                style={{
+                                  fontFamily: medium,
+                                  color: INK,
+                                  fontSize: 18,
+                                }}
+                              >
+                                Mi tarjeta
+                              </Text>
+                            </View>
+                          )}
+                        </Pressable>
+                      </View>
+                    </View>
+                  )
+                })}
+              </ScrollView>
+            </View>
+          )}
           {mode === 'settings' && (
             <>
               <Label>Nombre</Label>
@@ -817,7 +969,9 @@ export default function CardsScreen() {
               </Text>
             </>
           )}
-          {(mode === 'card' || mode === 'settings' || mode === 'payment') && (
+          {((mode === 'card' && cardStep === 'details') ||
+            mode === 'settings' ||
+            mode === 'payment') && (
             <>
               <Label>Cuenta para pagar</Label>
               <ScrollView
@@ -1041,7 +1195,14 @@ export default function CardsScreen() {
             }}
           >
             <Pressable
-              onPress={() => setMode(null)}
+              onPress={() => {
+                if (mode === 'card' && cardStep === 'design') {
+                  setCardStep('details')
+                  setError('')
+                } else {
+                  setMode(null)
+                }
+              }}
               style={{
                 flex: 1,
                 height: 50,
@@ -1055,11 +1216,11 @@ export default function CardsScreen() {
                   color: MUTED,
                 }}
               >
-                Cancelar
+                {mode === 'card' && cardStep === 'design' ? 'Atrás' : 'Cancelar'}
               </Text>
             </Pressable>
             <Pressable
-              onPress={save}
+              onPress={mode === 'card' && cardStep === 'details' ? nextCardStep : save}
               style={{
                 flex: 1,
                 height: 50,
@@ -1075,7 +1236,7 @@ export default function CardsScreen() {
                   color: '#fff',
                 }}
               >
-                Guardar
+                {mode === 'card' && cardStep === 'details' ? 'Siguiente' : 'Guardar'}
               </Text>
             </Pressable>
           </View>
