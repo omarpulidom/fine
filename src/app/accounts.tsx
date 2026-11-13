@@ -3,6 +3,7 @@ import { BottomSheetTextInput as TextInput } from '@gorhom/bottom-sheet'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useState } from 'react'
 import {
+  Alert,
   Image,
   Keyboard,
   Pressable,
@@ -20,6 +21,7 @@ import {
 } from '@/features/finance/accountDesigns'
 import { localDateKey } from '@/features/finance/dates'
 import {
+  deleteAccount,
   getLedger,
   type LiquidAccount,
   newAccountId,
@@ -104,6 +106,34 @@ export default function AccountsScreen() {
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'No se pudo guardar la cuenta.')
     }
+  }
+
+  function confirmDeleteAccount(account: LiquidAccount) {
+    Alert.alert(
+      'Eliminar cuenta',
+      `Se eliminará «${account.name}» y su saldo de la cartera. Esta acción no se puede deshacer.`,
+      [
+        {
+          text: 'Cancelar',
+          style: 'cancel',
+        },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: () => {
+            try {
+              setLedger(deleteAccount(account.id))
+              setEditing(undefined)
+            } catch (caught) {
+              Alert.alert(
+                'No se puede eliminar',
+                caught instanceof Error ? caught.message : 'Inténtalo de nuevo.',
+              )
+            }
+          },
+        },
+      ],
+    )
   }
 
   return (
@@ -502,6 +532,28 @@ export default function AccountsScreen() {
               </Text>
             </Pressable>
           </View>
+          {editing && accountStep === 'details' && (
+            <Pressable
+              onPress={() => confirmDeleteAccount(editing)}
+              accessibilityRole='button'
+              accessibilityLabel={`Eliminar cuenta ${editing.name}`}
+              style={{
+                alignSelf: 'center',
+                marginTop: 18,
+                padding: 8,
+              }}
+            >
+              <Text
+                style={{
+                  fontFamily: medium,
+                  fontSize: 13,
+                  color: '#c84242',
+                }}
+              >
+                Eliminar cuenta
+              </Text>
+            </Pressable>
+          )}
         </View>
       </AppBottomSheet>
     </SafeAreaView>

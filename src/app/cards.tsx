@@ -25,6 +25,7 @@ import {
   createBillingCycle,
   createCreditCard,
   deleteCardActivity,
+  deleteCreditCard,
   getLedger,
   newCardActivityId,
   newCardId,
@@ -394,6 +395,35 @@ export default function CardsScreen() {
     ])
   }
 
+  function confirmDeleteCard(cardId: string, cardName: string) {
+    Alert.alert(
+      'Eliminar tarjeta',
+      `Se eliminará «${cardName}», su deuda y sus ciclos. Esta acción no se puede deshacer.`,
+      [
+        {
+          text: 'Cancelar',
+          style: 'cancel',
+        },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: () => {
+            try {
+              setLedger(deleteCreditCard(cardId))
+              setSelectedCardId('')
+              setSelectedCycleId('')
+            } catch (caught) {
+              Alert.alert(
+                'No se puede eliminar',
+                caught instanceof Error ? caught.message : 'Inténtalo de nuevo.',
+              )
+            }
+          },
+        },
+      ],
+    )
+  }
+
   return (
     <SafeAreaView
       style={{
@@ -515,15 +545,31 @@ export default function CardsScreen() {
                   borderRadius: 12,
                 }}
               >
-                <Text
+                <View
                   style={{
-                    fontFamily: semibold,
-                    fontSize: 17,
-                    color: INK,
+                    flexDirection: 'row',
+                    alignItems: 'center',
                   }}
                 >
-                  {card.name}
-                </Text>
+                  <Text
+                    style={{
+                      flex: 1,
+                      fontFamily: semibold,
+                      fontSize: 17,
+                      color: INK,
+                    }}
+                  >
+                    {card.name}
+                  </Text>
+                  <Pressable
+                    onPress={() => confirmDeleteCard(card.id, card.name)}
+                    hitSlop={10}
+                    accessibilityRole='button'
+                    accessibilityLabel={`Eliminar tarjeta ${card.name}`}
+                  >
+                    <Feather name='trash-2' size={18} color='#c84242' />
+                  </Pressable>
+                </View>
                 <Text
                   style={{
                     fontFamily: regular,

@@ -32,6 +32,8 @@ La app no busca predecir hábitos ni estimar consumos futuros. Es una proyecció
 
 Las cuentas se crean en dos pasos: nombre y saldo, seguido de un carrusel con diseños de débito BBVA, Nu y Plata, además de «Otro banco» y «Efectivo». La selección determina si la cuenta es bancaria o efectivo y, cuando hay imagen, aparece en la cartera de Inicio.
 
+Permitir eliminar cuentas y tarjetas con confirmación. Una cuenta con movimientos realizados o programados, o usada por pagos de tarjeta, debe desvincularse antes; una tarjeta con compras o pagos registrados debe vaciar su actividad antes. Al eliminar una tarjeta sin actividad, se eliminan también sus ciclos. No se dejan referencias huérfanas en el historial.
+
 ### Posibles funciones posteriores, no bloqueantes para el MVP
 
 - Presupuestos, metas de ahorro, préstamos y estadísticas avanzadas por categorías.

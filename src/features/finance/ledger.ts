@@ -3,6 +3,7 @@ import type { AccountDesignId } from './accountDesigns'
 import type { CardDesignId } from './cardDesigns'
 import { isDateKey, localDateKey } from './dates'
 import { allocateInstallments, type Installment } from './installments'
+import { getScheduledMovements } from './scheduledMovements'
 
 const LEDGER_KEY = 'finance:ledger:v1'
 const LEGACY_BALANCE_KEY = 'finance:cash-account-balance-cents:v1'
@@ -211,6 +212,42 @@ export function upsertAccount(account: LiquidAccount): Ledger {
   })
 }
 
+export function deleteAccount(accountId: string): Ledger {
+  const ledger = getLedger()
+  if (!ledger.accounts.some((account) => account.id === accountId)) {
+    throw new Error('No se encontró la cuenta.')
+  }
+  if (
+    ledger.completedMovements.some(
+      (movement) =>
+        movement.accountId === accountId || movement.counterpartyAccountId === accountId,
+    )
+  ) {
+    throw new Error('Esta cuenta tiene movimientos realizados. Elimínalos primero.')
+  }
+  if (
+    getScheduledMovements().some(
+      (movement) =>
+        movement.accountId === accountId || movement.counterpartyAccountId === accountId,
+    )
+  ) {
+    throw new Error('Esta cuenta tiene movimientos programados. Elimínalos o cámbialos primero.')
+  }
+  if (ledger.cards.some((card) => card.paymentSourceAccountId === accountId)) {
+    throw new Error(
+      'Una tarjeta usa esta cuenta para pagar. Cambia su cuenta de pago o elimina la tarjeta primero.',
+    )
+  }
+  if (ledger.cardActivity.some((activity) => activity.sourceAccountId === accountId)) {
+    throw new Error('Esta cuenta tiene pagos de tarjeta registrados. Elimínalos primero.')
+  }
+  return persist({
+    ...ledger,
+    accounts: ledger.accounts.filter((account) => account.id !== accountId),
+    reconciliations: ledger.reconciliations.filter((item) => item.accountId !== accountId),
+  })
+}
+
 export function upsertCompletedMovement(movement: CompletedMovement, todayKey: string): Ledger {
   if (!isCompletedMovement(movement) || movement.effectiveDate > todayKey) {
     throw new Error('Movimiento realizado inválido')
@@ -352,6 +389,31 @@ export function createCreditCard(card: CreditCard, initialCycle: BillingCycle | 
           initialCycle,
         ]
       : ledger.cycles,
+  })
+}
+
+export function deleteCreditCard(cardId: string): Ledger {
+  const ledger = getLedger()
+  if (!ledger.cards.some((card) => card.id === cardId)) {
+    throw new Error('No se encontró la tarjeta.')
+  }
+  const cycleIds = new Set(
+    ledger.cycles.filter((cycle) => cycle.cardId === cardId).map((cycle) => cycle.id),
+  )
+  if (
+    ledger.cardActivity.some(
+      (activity) =>
+        activity.cardId === cardId ||
+        cycleIds.has(activity.cycleId) ||
+        activity.installments?.some((part) => cycleIds.has(part.cycleId)),
+    )
+  ) {
+    throw new Error('Esta tarjeta tiene compras o pagos registrados. Elimínalos primero.')
+  }
+  return persist({
+    ...ledger,
+    cards: ledger.cards.filter((card) => card.id !== cardId),
+    cycles: ledger.cycles.filter((cycle) => cycle.cardId !== cardId),
   })
 }
 
