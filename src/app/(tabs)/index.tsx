@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Circle, Line, Path } from "react-native-svg";
 import { AccountsHub } from "@/components/finance/AccountsHub";
+import { ScheduledMovementsList } from "@/components/finance/ScheduledMovementsList";
 import { formatDateDisplay, localDateKey } from "@/features/finance/dates";
 import { liquidityHistory } from "@/features/finance/history";
 import {
@@ -119,21 +120,6 @@ export default function HomeTab() {
   const history = useMemo(
     () => liquidityHistory(ledger, todayKey),
     [ledger, todayKey],
-  );
-  const sortedMovements = useMemo(
-    () =>
-      [
-        ...movements.filter((movement) =>
-          nextOccurrenceDate(movement, completedOccurrences),
-        ),
-      ].sort((a, b) =>
-        (
-          nextOccurrenceDate(a, completedOccurrences) ?? a.effectiveDate
-        ).localeCompare(
-          nextOccurrenceDate(b, completedOccurrences) ?? b.effectiveDate,
-        ),
-      ),
-    [movements, completedOccurrences],
   );
   const selectedDate = new Date(
     today.getFullYear(),
@@ -621,194 +607,20 @@ export default function HomeTab() {
           )}
         />
 
-        <View
-          style={{
-            marginTop: 35,
-          }}
-        >
-          <Text
-            style={{
-              color: MUTED,
-              fontFamily: font.regular,
-              fontSize: 14,
+        <View style={{ marginTop: 35 }}>
+          <ScheduledMovementsList
+            ledger={ledger}
+            movements={movements}
+            completedOccurrences={completedOccurrences}
+            todayKey={todayKey}
+            onEdit={(movement) => {
+              setEditingScheduled(movement);
+              setMovementModalVisible(true);
             }}
-          >
-            Movimientos programados
-          </Text>
-          {sortedMovements.length === 0 && cardPayments.length === 0 ? (
-            <View
-              style={{
-                marginTop: 9,
-                minHeight: 74,
-                borderRadius: 12,
-                backgroundColor: "#fff",
-                alignItems: "center",
-                justifyContent: "center",
-                paddingHorizontal: 20,
-              }}
-            >
-              <Text
-                style={{
-                  color: MUTED,
-                  fontFamily: font.regular,
-                  fontSize: 14,
-                  textAlign: "center",
-                }}
-              >
-                Aún no hay movimientos programados
-              </Text>
-            </View>
-          ) : (
-            sortedMovements.map((movement) => (
-              <View
-                key={movement.id}
-                style={{
-                  marginTop: 9,
-                  minHeight: 64,
-                  borderRadius: 12,
-                  backgroundColor: "#fff",
-                  flexDirection: "row",
-                  alignItems: "center",
-                  paddingHorizontal: 16,
-                }}
-              >
-                <Pressable
-                  onPress={() => {
-                    setEditingScheduled(movement);
-                    setMovementModalVisible(true);
-                  }}
-                  style={{
-                    flex: 1,
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: INK,
-                      fontFamily: font.medium,
-                      fontSize: 14,
-                    }}
-                  >
-                    {movement.description ||
-                      (movement.type === "income"
-                        ? "Ingreso"
-                        : movement.type === "transfer"
-                          ? "Transferencia"
-                          : "Gasto")}
-                  </Text>
-                  <Text
-                    style={{
-                      color: MUTED,
-                      fontFamily: font.regular,
-                      fontSize: 12,
-                      marginTop: 3,
-                    }}
-                  >
-                    {movement.recurrence
-                      ? `${movement.recurrence === "weekly" ? "Semanal" : movement.recurrence === "biweekly" ? "Quincenal" : "Mensual"} · ${nextOccurrenceDate(movement, completedOccurrences) ?? "Finalizada"}`
-                      : `${movement.effectiveDate < todayKey ? "Pendiente desde " : ""}${movement.effectiveDate}`}
-                    {movement.accountId
-                      ? ` · ${ledger.accounts.find((account) => account.id === movement.accountId)?.name ?? "Cuenta"}`
-                      : ""}
-                  </Text>
-                </Pressable>
-                <Text
-                  style={{
-                    color: INK,
-                    fontFamily: font.medium,
-                    fontSize: 14,
-                    marginRight: 14,
-                  }}
-                >
-                  {movement.type === "income"
-                    ? "+"
-                    : movement.type === "transfer"
-                      ? "↔ "
-                      : "−"}
-                  {formatMoney(movement.amountCents)}
-                </Text>
-                <Pressable
-                  onPress={() => confirmCompleteMovement(movement)}
-                  accessibilityRole="button"
-                  accessibilityLabel="Registrar movimiento como realizado"
-                  hitSlop={8}
-                  style={{
-                    marginRight: 14,
-                  }}
-                >
-                  <Feather name="check-circle" size={17} color={MUTED} />
-                </Pressable>
-                <Pressable
-                  onPress={() => confirmDeleteMovement(movement)}
-                  accessibilityRole="button"
-                  accessibilityLabel="Eliminar movimiento"
-                  hitSlop={10}
-                >
-                  <Feather name="trash-2" size={16} color={MUTED} />
-                </Pressable>
-              </View>
-            ))
-          )}
-          {ledger.cycles
-            .filter(
-              (cycle) =>
-                cycle.scheduledDate &&
-                cycle.scheduledAmountCents > cycle.paidAmountCents,
-            )
-            .map((cycle) => (
-              <Pressable
-                key={cycle.id}
-                onPress={() => router.push("/cards")}
-                style={{
-                  marginTop: 9,
-                  minHeight: 64,
-                  borderRadius: 12,
-                  backgroundColor: "#fff",
-                  flexDirection: "row",
-                  alignItems: "center",
-                  paddingHorizontal: 16,
-                }}
-              >
-                <View
-                  style={{
-                    flex: 1,
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: INK,
-                      fontFamily: font.medium,
-                      fontSize: 14,
-                    }}
-                  >
-                    Pago de{" "}
-                    {ledger.cards.find((card) => card.id === cycle.cardId)
-                      ?.name ?? "tarjeta"}
-                  </Text>
-                  <Text
-                    style={{
-                      color: MUTED,
-                      fontFamily: font.regular,
-                      fontSize: 12,
-                      marginTop: 3,
-                    }}
-                  >
-                    {cycle.scheduledDate}
-                  </Text>
-                </View>
-                <Text
-                  style={{
-                    color: INK,
-                    fontFamily: font.medium,
-                    fontSize: 14,
-                  }}
-                >
-                  −
-                  {formatMoney(
-                    cycle.scheduledAmountCents - cycle.paidAmountCents,
-                  )}
-                </Text>
-              </Pressable>
-            ))}
+            onComplete={confirmCompleteMovement}
+            onDelete={confirmDeleteMovement}
+            onOpenCard={(cardId) => router.push({ pathname: "/cards", params: { cardId } })}
+          />
           <Pressable
             onPress={() => {
               if (!ledger.accounts.length) {

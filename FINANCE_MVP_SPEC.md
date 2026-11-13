@@ -43,11 +43,11 @@ La gráfica de liquidez es el componente central:
 
 - Mostrar saldo disponible de hoy.
 - Curva de saldo proyectado por día.
-- En la proyección, tres trazos desde el saldo de hoy: saldo total en negro, saldo más ingresos acumulados en gris claro y saldo menos gastos acumulados en gris más oscuro. Los gastos incluyen pagos de tarjeta programados explícitamente. Mostrar los importes acumulados al elegir una fecha.
+- En la proyección, tres trazos desde el saldo de hoy: saldo total en negro, saldo más ingresos acumulados en gris claro y saldo menos gastos acumulados en gris más oscuro. Los gastos incluyen pagos de tarjeta programados explícitamente. Un badge compacto muestra solo los ingresos y gastos no nulos del día elegido.
 - Permitir tocar/arrastrar sobre la curva para consultar **fecha + saldo**.
 - Mostrar cambios únicamente en días con movimientos previstos; una línea horizontal en periodos sin eventos.
 - Distinguir tramo histórico/actual y tramo proyectado.
-- Mostrar próximos ingresos, gastos y pagos programados.
+- Mostrar próximos ingresos, gastos y pagos programados en una lista cronológica con filtro de todos, ingresos o gastos. Cada fila separa título e importe de fecha y acciones.
 - Acceso inmediato a **Añadir movimiento**.
 - Debajo de la gráfica, un módulo de dos columnas con separación: a la izquierda cuatro accesos circulares pequeños sin texto visible (simular compra, estadísticas, historial y registrar movimiento); a la derecha una cartera negra más ancha y de menor altura, con la liquidez total y una lengüeta sobre dos tarjetas decorativas. Los accesos deben tener etiquetas de accesibilidad.
 - Al tocar la cartera, mantenerla fija y elevar las dos tarjetas originales por detrás de la lengüeta, sin sacarlas por completo ni desplazar el contenido inferior. Cada elemento disponible abre su pantalla de gestión enfocada; las tarjetas de crédito muestran su deuda por separado y no se suman a la liquidez. El botón «+» aparece con la animación y abre la pantalla «Cuentas y tarjetas» para elegir si agregar una cuenta o tarjeta de crédito.
