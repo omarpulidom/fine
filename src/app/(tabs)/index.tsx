@@ -667,7 +667,7 @@ export default function HomeTab() {
               accessibilityRole="button"
               accessibilityLabel={page === 0 ? "Mostrar gráfica" : "Mostrar cartera"}
               accessibilityState={{ selected: carouselPage === page }}
-              style={{ width: 24, height: 24, alignItems: "center", justifyContent: "center" }}
+              style={{ width: 16, height: 24, alignItems: "center", justifyContent: "center" }}
             >
               <View
                 style={{
