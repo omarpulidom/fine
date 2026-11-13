@@ -54,8 +54,8 @@ La gráfica de liquidez es el componente central:
 - Mostrar próximos ingresos, gastos y pagos programados en una lista cronológica con filtro de todos, ingresos o gastos. Cada fila separa título e importe de fecha y acciones.
 - Acceso inmediato a **Añadir movimiento**.
 - Debajo de la fecha y el saldo principal, mostrar un carrusel horizontal de altura compartida que se ajusta al ancho de la cartera: primera página con la gráfica, leyenda y selector de periodos; segunda página con la cartera y los accesos. La fecha y el saldo principal permanecen fuera del carrusel, y la lista inferior no cambia de posición al deslizar. Al mostrar la cartera, la fecha seleccionada vuelve a hoy.
-- En la segunda página, la cartera negra ocupa todo el ancho disponible y mantiene un perfil bajo, con la liquidez total y una lengüeta sobre hasta tres tarjetas reales. Una tarjeta queda arriba; dos conservan la separación actual; tres usan una separación menor para caber detrás de la lengüeta. Debajo hay cuatro accesos circulares pequeños sin texto visible, alineados a la izquierda en una fila: simular compra, estadísticas, historial y registrar movimiento. Los accesos tienen etiquetas de accesibilidad.
-- Al tocar la cartera o su lengüeta, mantenerla fija y elevar las tarjetas visibles por detrás de la lengüeta, sin sacarlas por completo ni desplazar el contenido inferior. La lengüeta forma parte de la cartera y nunca abre una cuenta. Cada tarjeta disponible abre su pantalla de gestión enfocada; las tarjetas de crédito muestran su deuda por separado y no se suman a la liquidez. El botón «+» aparece con la animación y abre la pantalla «Cuentas y tarjetas» para elegir si agregar una cuenta o tarjeta de crédito.
+- En la segunda página, la cartera negra ocupa todo el ancho disponible y mantiene un perfil bajo, con la liquidez total y una lengüeta sobre hasta tres tarjetas reales. Una tarjeta queda arriba; dos conservan la separación actual; tres usan una separación menor para caber detrás de la lengüeta. Debajo hay cinco accesos circulares pequeños sin texto visible, alineados a la izquierda en una fila: simular compra, estadísticas, historial, cuentas y tarjetas, y registrar movimiento. Los accesos tienen etiquetas de accesibilidad.
+- Al tocar la cartera o su lengüeta, mantenerla fija y elevar las tarjetas visibles por detrás de la lengüeta, sin sacarlas por completo ni desplazar el contenido inferior. La lengüeta forma parte de la cartera y nunca abre una cuenta. Cada tarjeta disponible abre su pantalla de gestión enfocada; las tarjetas de crédito muestran su deuda por separado y no se suman a la liquidez. El botón «+» aparece con la animación y abre la pantalla «Agregar» para elegir entre cuenta o tarjeta de crédito. El penúltimo acceso de la fila abre «Cuentas y tarjetas» con las listas existentes.
 - Debajo del importe de la cartera, mostrar la cantidad real de cuentas y tarjetas en lugar de repetir «Saldo disponible»; si no hay cuentas, mostrar «Añadir primera cuenta».
 
 **Definición de liquidez para esta pantalla:** dinero disponible en efectivo y cuentas bancarias; una deuda con tarjeta **no** disminuye automáticamente esa liquidez hasta el día de su pago proyectado o efectivo.
@@ -306,6 +306,7 @@ Las estadísticas se **derivan** de movimientos realizados; no necesitan otra fu
 - Programación de movimientos recurrentes.
 
 **Configuración de cuentas/tarjetas** (pantallas secundarias)
+- «Agregar» muestra las opciones para crear una cuenta o tarjeta de crédito; «Cuentas y tarjetas» muestra las listas de instrumentos existentes.
 - Crear y ajustar cuentas, saldo inicial y tarjetas.
 - Editar corte, vencimientos y pagos previstos.
 - Registrar una compra MSI y revisar sus cuotas por ciclo.

@@ -2,8 +2,9 @@ import { Feather } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
 import { useRouter } from 'expo-router'
 import { useCallback, useState } from 'react'
-import { Pressable, ScrollView, Text, View } from 'react-native'
+import { Pressable, ScrollView, Text } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { InstrumentRow } from '@/components/finance/InstrumentRow'
 import { getAccountDesign } from '@/features/finance/accountDesigns'
 import { getLedger } from '@/features/finance/ledger'
 import { formatMoney } from '@/features/finance/money'
@@ -11,79 +12,12 @@ import { formatMoney } from '@/features/finance/money'
 const ink = '#101010'
 const muted = '#888'
 const regular = 'Inter_400Regular'
-const medium = 'Inter_500Medium'
 const semibold = 'Inter_600SemiBold'
 
 export default function AccountsAndCardsScreen() {
   const router = useRouter()
   const [ledger, setLedger] = useState(getLedger)
   useFocusEffect(useCallback(() => setLedger(getLedger()), []))
-
-  function choice(
-    label: string,
-    detail: string,
-    icon: 'briefcase' | 'credit-card',
-    onPress: () => void,
-    disabled = false,
-    key?: string,
-  ) {
-    return (
-      <Pressable
-        key={key}
-        onPress={onPress}
-        disabled={disabled}
-        accessibilityRole='button'
-        accessibilityLabel={label}
-        accessibilityState={{
-          disabled,
-        }}
-        style={{
-          backgroundColor: '#fff',
-          borderRadius: 13,
-          padding: 16,
-          marginTop: 9,
-          flexDirection: 'row',
-          alignItems: 'center',
-          opacity: disabled ? 0.45 : 1,
-        }}
-      >
-        <Feather
-          name={icon}
-          size={19}
-          color={ink}
-          style={{
-            marginRight: 15,
-          }}
-        />
-        <View
-          style={{
-            flex: 1,
-          }}
-        >
-          <Text
-            style={{
-              fontFamily: medium,
-              color: ink,
-              fontSize: 15,
-            }}
-          >
-            {label}
-          </Text>
-          <Text
-            style={{
-              fontFamily: regular,
-              color: muted,
-              fontSize: 12,
-              marginTop: 3,
-            }}
-          >
-            {detail}
-          </Text>
-        </View>
-        <Feather name='arrow-right' size={17} color={muted} />
-      </Pressable>
-    )
-  }
 
   return (
     <SafeAreaView
@@ -127,39 +61,9 @@ export default function AccountsAndCardsScreen() {
             marginTop: 8,
           }}
         >
-          Elige qué quieres agregar. Las tarjetas de crédito muestran su deuda por separado.
+          Consulta tus cuentas y tarjetas de crédito. La deuda de las tarjetas se muestra por
+          separado.
         </Text>
-        <Text
-          style={{
-            fontFamily: regular,
-            color: muted,
-            fontSize: 13,
-            marginTop: 30,
-          }}
-        >
-          Agregar
-        </Text>
-        {choice('Cuenta', 'Efectivo o banco / débito', 'briefcase', () =>
-          router.push({
-            pathname: '/accounts',
-            params: {
-              create: '1',
-            },
-          }),
-        )}
-        {choice(
-          'Tarjeta de crédito',
-          ledger.accounts.length ? 'Compras, ciclos y pagos' : 'Añade primero una cuenta bancaria',
-          'credit-card',
-          () =>
-            router.push({
-              pathname: '/cards',
-              params: {
-                create: '1',
-              },
-            }),
-          !ledger.accounts.length,
-        )}
 
         <Text
           style={{
@@ -171,22 +75,22 @@ export default function AccountsAndCardsScreen() {
         >
           Tus cuentas
         </Text>
-        {ledger.accounts.map((account) =>
-          choice(
-            account.name,
-            `${account.type === 'cash' ? 'Efectivo' : (getAccountDesign(account.accountDesignId)?.label ?? 'Banco / débito')} · ${formatMoney(account.balanceCents)}`,
-            'briefcase',
-            () =>
+        {ledger.accounts.map((account) => (
+          <InstrumentRow
+            key={account.id}
+            label={account.name}
+            detail={`${account.type === 'cash' ? 'Efectivo' : (getAccountDesign(account.accountDesignId)?.label ?? 'Banco / débito')} · ${formatMoney(account.balanceCents)}`}
+            icon='briefcase'
+            onPress={() =>
               router.push({
                 pathname: '/accounts',
                 params: {
                   accountId: account.id,
                 },
-              }),
-            false,
-            account.id,
-          ),
-        )}
+              })
+            }
+          />
+        ))}
         {!ledger.accounts.length && (
           <Text
             style={{
@@ -210,22 +114,22 @@ export default function AccountsAndCardsScreen() {
         >
           Tarjetas de crédito
         </Text>
-        {ledger.cards.map((card) =>
-          choice(
-            card.name,
-            `Deuda ${formatMoney(card.currentDebtCents)}`,
-            'credit-card',
-            () =>
+        {ledger.cards.map((card) => (
+          <InstrumentRow
+            key={card.id}
+            label={card.name}
+            detail={`Deuda ${formatMoney(card.currentDebtCents)}`}
+            icon='credit-card'
+            onPress={() =>
               router.push({
                 pathname: '/cards',
                 params: {
                   cardId: card.id,
                 },
-              }),
-            false,
-            card.id,
-          ),
-        )}
+              })
+            }
+          />
+        ))}
         {!ledger.cards.length && (
           <Text
             style={{

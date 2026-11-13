@@ -21,6 +21,7 @@ type Props = {
   onSelectAccount: (id: string) => void
   onSelectCard: (id: string) => void
   onAdd: () => void
+  onManage: () => void
   onSimulate: () => void
   onStatistics: () => void
   onHistory: () => void
@@ -47,7 +48,7 @@ const actionRowGap = 16
 const walletHeightRatio = 0.66
 
 function getActionSize(width: number) {
-  return Math.min(50, Math.floor((width - 36) / 4))
+  return Math.min(50, Math.floor((width - 64) / 5))
 }
 
 export function getAccountsHubHeight(width: number) {
@@ -155,6 +156,7 @@ export function AccountsHub({
   onSelectAccount,
   onSelectCard,
   onAdd,
+  onManage,
   onSimulate,
   onStatistics,
   onHistory,
@@ -166,7 +168,7 @@ export function AccountsHub({
   const available = width - 48
   const walletWidth = available
   const actionSize = getActionSize(walletWidth)
-  const actionGap = Math.min(20, (walletWidth - actionSize * 4) / 3)
+  const actionGap = Math.min(16, Math.max(0, (walletWidth - actionSize * 5) / 4))
   const walletHeight = walletWidth * walletHeightRatio
   const visibleCards = cards.slice(accounts.length ? -2 : -3)
   const visibleAccounts = accounts.slice(-(3 - visibleCards.length))
@@ -229,6 +231,12 @@ export function AccountsHub({
       onPress: onHistory,
     },
     {
+      key: 'manage',
+      icon: 'layers',
+      label: 'Cuentas y tarjetas',
+      onPress: onManage,
+    },
+    {
       key: 'register',
       icon: 'plus',
       label: 'Registrar movimiento',
@@ -268,7 +276,7 @@ export function AccountsHub({
       >
         {extraCount > 0 && expanded && (
           <Pressable
-            onPress={() => select(onAdd)}
+            onPress={() => select(onManage)}
             accessibilityRole='button'
             accessibilityLabel='Ver todas las cuentas y tarjetas'
             style={{
