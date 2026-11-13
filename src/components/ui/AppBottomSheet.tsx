@@ -6,24 +6,21 @@ import {
 } from '@gorhom/bottom-sheet'
 import type { ReactNode } from 'react'
 import { useCallback, useEffect, useRef } from 'react'
+import { useWindowDimensions } from 'react-native'
 
 type Props = {
   visible: boolean
   onClose: () => void
   children: ReactNode
-  snapPoints?: string[]
 }
 
 export function AppBottomSheet({
   visible,
   onClose,
   children,
-  snapPoints = [
-    '75%',
-    '92%',
-  ],
 }: Props) {
   const sheetRef = useRef<BottomSheetModal>(null)
+  const { height } = useWindowDimensions()
 
   useEffect(() => {
     if (visible) sheetRef.current?.present()
@@ -47,8 +44,8 @@ export function AppBottomSheet({
   return (
     <BottomSheetModal
       ref={sheetRef}
-      snapPoints={snapPoints}
-      enableDynamicSizing={false}
+      enableDynamicSizing
+      maxDynamicContentSize={Math.round(height * 0.9)}
       enablePanDownToClose
       keyboardBehavior='interactive'
       keyboardBlurBehavior='restore'

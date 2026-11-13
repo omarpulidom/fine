@@ -122,9 +122,6 @@ export function DateField({
         <AppBottomSheet
           visible={visible}
           onClose={() => setVisible(false)}
-          snapPoints={[
-            '48%',
-          ]}
         >
           <Text
             style={{

@@ -118,10 +118,6 @@ export function ScheduledMovementModal({
     <AppBottomSheet
       visible={visible}
       onClose={onClose}
-      snapPoints={[
-        '80%',
-        '94%',
-      ]}
     >
       <View>
         <View

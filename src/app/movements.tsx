@@ -307,10 +307,6 @@ export default function MovementsScreen() {
       <AppBottomSheet
         visible={editing !== undefined}
         onClose={() => setEditing(undefined)}
-        snapPoints={[
-          '80%',
-          '94%',
-        ]}
       >
         <View>
           <Text
