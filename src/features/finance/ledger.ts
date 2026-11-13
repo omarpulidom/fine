@@ -1,6 +1,7 @@
 import { storageMMKV } from '@/lib/mmkv/stores'
 import type { AccountDesignId } from './accountDesigns'
 import type { CardDesignId } from './cardDesigns'
+import { cutoffForMonth, cycleDates, type BillingRule, previousCutoffMonth } from './billingCalendar'
 import { isDateKey, localDateKey } from './dates'
 import { allocateInstallments, type Installment } from './installments'
 import { getScheduledMovements } from './scheduledMovements'
@@ -38,6 +39,7 @@ export type CreditCard = {
   unbilledOpeningCents: number
   paymentSourceAccountId: string
   createdDate: string
+  billingRule?: BillingRule
 }
 
 export type BillingCycle = {
@@ -51,6 +53,9 @@ export type BillingCycle = {
   paidAmountCents: number
   paymentToAvoidInterestCents?: number
   minimumPaymentCents?: number
+  automatic?: boolean
+  paymentMode?: 'automatic' | 'manual'
+  dueDateConfirmed?: boolean
 }
 
 export type CardActivity = {
@@ -147,7 +152,7 @@ export function getLedger(): Ledger {
           if (originalAccounts.some((account) => !account.asOfDate)) {
             storageMMKV.set(LEDGER_KEY, JSON.stringify(ledger))
           }
-          return ledger
+          return ensureBillingCalendar(ledger, localDateKey(new Date()))
         }
       }
     } catch {
@@ -353,6 +358,106 @@ export function statementAmountCents(ledger: Ledger, cycleId: string): number {
   )
 }
 
+function automaticCycles(ledger: Ledger, card: CreditCard, today: string): BillingCycle[] {
+  if (!card.billingRule) return []
+  const existingMonths = new Set(
+    ledger.cycles.filter((cycle) => cycle.cardId === card.id).map((cycle) => cycle.cutoffDate.slice(0, 7)),
+  )
+  const anchorMonth = card.billingRule.anchorCutoffMonth
+  const todayMonth = today.slice(0, 7)
+  const yearDiff = Number(todayMonth.slice(0, 4)) - Number(anchorMonth.slice(0, 4))
+  const monthDiff = Number(todayMonth.slice(5, 7)) - Number(anchorMonth.slice(5, 7))
+  const start = Math.max(0, yearDiff * 12 + monthDiff - 1)
+  const result: BillingCycle[] = []
+  for (let offset = start; offset < start + 48; offset++) {
+    const dates = cycleDates(card.billingRule, card.cutoffDay, offset)
+    const month = dates.cutoffDate.slice(0, 7)
+    if (existingMonths.has(month) || dates.dueDate <= dates.cutoffDate) continue
+    result.push({
+      id: `auto:${card.id}:${month}`,
+      cardId: card.id,
+      ...dates,
+      openingStatementCents: 0,
+      scheduledAmountCents: 0,
+      paidAmountCents: 0,
+      automatic: true,
+      paymentMode: 'automatic',
+      dueDateConfirmed: false,
+    })
+    existingMonths.add(month)
+  }
+  return result
+}
+
+export function ensureBillingCalendar(ledger: Ledger, today: string): Ledger {
+  const cycles = [...ledger.cycles]
+  for (const card of ledger.cards) {
+    cycles.push(...automaticCycles({ ...ledger, cycles }, card, today))
+  }
+  return cycles.length === ledger.cycles.length ? ledger : persist({ ...ledger, cycles })
+}
+
+export function projectedCardPayments(ledger: Ledger): { date: string; amountCents: number }[] {
+  return ledger.cycles.flatMap((cycle) => {
+    const automatic = cycle.paymentMode === 'automatic'
+    const target = automatic
+      ? statementAmountCents(ledger, cycle.id)
+      : cycle.scheduledAmountCents
+    const amountCents = Math.max(0, target - cycle.paidAmountCents)
+    const date = automatic ? cycle.dueDate : cycle.scheduledDate
+    return date && amountCents > 0 ? [{ date, amountCents }] : []
+  })
+}
+
+export function activateAutomaticBilling(cardId: string, nextDueDate: string): Ledger {
+  const ledger = getLedger()
+  const card = ledger.cards.find((item) => item.id === cardId)
+  if (!card || card.billingRule || !isDateKey(nextDueDate) || nextDueDate <= localDateKey(new Date())) {
+    throw new Error('Selecciona una fecha límite futura válida.')
+  }
+  const billingRule = {
+    anchorCutoffMonth: previousCutoffMonth(nextDueDate, card.cutoffDay),
+    anchorDueDate: nextDueDate,
+  }
+  const updated = {
+    ...ledger,
+    cards: ledger.cards.map((item) => item.id === cardId ? { ...item, billingRule } : item),
+  }
+  return ensureBillingCalendar(persist(updated), localDateKey(new Date()))
+}
+
+export function confirmCycleStatement(
+  cycleId: string,
+  openingCents: number,
+  dueDate: string,
+): Ledger {
+  const ledger = getLedger()
+  const cycle = ledger.cycles.find((item) => item.id === cycleId)
+  const card = ledger.cards.find((item) => item.id === cycle?.cardId)
+  if (!cycle || !card || !cycle.automatic || !Number.isSafeInteger(openingCents) ||
+      openingCents < 0 ||
+      !isDateKey(dueDate) || dueDate <= cycle.cutoffDate) {
+    throw new Error('Revisa el saldo pendiente y la fecha límite.')
+  }
+  const delta = openingCents - cycle.openingStatementCents
+  if (delta > card.unbilledOpeningCents || delta < -cycle.openingStatementCents) {
+    throw new Error('Saldo pendiente inválido.')
+  }
+  if (statementAmountCents(ledger, cycleId) + delta < cycle.paidAmountCents) {
+    throw new Error('El saldo confirmado no puede ser menor que los pagos realizados.')
+  }
+  return persist({
+    ...ledger,
+    cards: ledger.cards.map((item) => item.id === card.id
+      ? { ...item, unbilledOpeningCents: item.unbilledOpeningCents - delta }
+      : item),
+    cycles: ledger.cycles.map((item) => item.id === cycleId
+      ? { ...item, openingStatementCents: openingCents, dueDate, dueDateConfirmed: true,
+          paymentMode: 'automatic' as const }
+      : item),
+  })
+}
+
 export function createCreditCard(card: CreditCard, initialCycle: BillingCycle | null): Ledger {
   const ledger = getLedger()
   if (
@@ -377,7 +482,7 @@ export function createCreditCard(card: CreditCard, initialCycle: BillingCycle | 
       initialCycle.dueDate <= initialCycle.cutoffDate)
   )
     throw new Error('Ciclo inicial inválido')
-  return persist({
+  return ensureBillingCalendar(persist({
     ...ledger,
     cards: [
       ...ledger.cards,
@@ -389,7 +494,7 @@ export function createCreditCard(card: CreditCard, initialCycle: BillingCycle | 
           initialCycle,
         ]
       : ledger.cycles,
-  })
+  }), localDateKey(new Date()))
 }
 
 export function deleteCreditCard(cardId: string): Ledger {
@@ -446,6 +551,14 @@ export function updateCreditCardSettings(
           }
         : card,
     ),
+    cycles: ledger.cycles.map((cycle) => {
+      if (cycle.cardId !== cardId || !cycle.automatic || cycle.dueDateConfirmed ||
+          cycle.openingStatementCents > 0 || cycle.paidAmountCents > 0 ||
+          ledger.cardActivity.some((item) => item.cycleId === cycle.id ||
+            item.installments?.some((part) => part.cycleId === cycle.id))) return cycle
+      const nextCutoff = cutoffForMonth(cycle.cutoffDate.slice(0, 7), cutoffDay)
+      return nextCutoff < cycle.dueDate ? { ...cycle, cutoffDate: nextCutoff } : cycle
+    }),
   })
 }
 
@@ -490,10 +603,6 @@ export function scheduleCyclePayment(
   scheduledDate: string | undefined,
   scheduledAmountCents: number,
   dueDate?: string,
-  details?: {
-    paymentToAvoidInterestCents?: number
-    minimumPaymentCents?: number
-  },
 ): Ledger {
   const ledger = getLedger()
   const cycle = ledger.cycles.find((item) => item.id === cycleId)
@@ -503,12 +612,7 @@ export function scheduleCyclePayment(
     (dueDate && (!isDateKey(dueDate) || dueDate <= cycle.cutoffDate)) ||
     !Number.isSafeInteger(scheduledAmountCents) ||
     scheduledAmountCents < 0 ||
-    scheduledAmountCents > statementAmountCents(ledger, cycleId) ||
-    (details?.paymentToAvoidInterestCents !== undefined &&
-      (!Number.isSafeInteger(details.paymentToAvoidInterestCents) ||
-        details.paymentToAvoidInterestCents < 0)) ||
-    (details?.minimumPaymentCents !== undefined &&
-      (!Number.isSafeInteger(details.minimumPaymentCents) || details.minimumPaymentCents < 0))
+    scheduledAmountCents > statementAmountCents(ledger, cycleId)
   ) {
     throw new Error('Pago programado inválido')
   }
@@ -521,8 +625,8 @@ export function scheduleCyclePayment(
             dueDate: dueDate ?? item.dueDate,
             scheduledDate,
             scheduledAmountCents,
-            paymentToAvoidInterestCents: details?.paymentToAvoidInterestCents,
-            minimumPaymentCents: details?.minimumPaymentCents,
+            paymentMode: 'manual',
+            dueDateConfirmed: true,
           }
         : item,
     ),

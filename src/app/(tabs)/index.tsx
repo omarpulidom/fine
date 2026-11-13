@@ -19,6 +19,7 @@ import { liquidityHistory } from "@/features/finance/history";
 import {
   getLedger,
   newMovementId,
+  projectedCardPayments,
   totalLiquidity,
   upsertCompletedMovement,
 } from "@/features/finance/ledger";
@@ -87,19 +88,8 @@ export default function HomeTab() {
     [ledger.completedMovements],
   );
   const cardPayments = useMemo(
-    () =>
-      ledger.cycles.flatMap((cycle) =>
-        cycle.scheduledDate &&
-        cycle.scheduledAmountCents > cycle.paidAmountCents
-          ? [
-              {
-                date: cycle.scheduledDate,
-                amountCents: cycle.scheduledAmountCents - cycle.paidAmountCents,
-              },
-            ]
-          : [],
-      ),
-    [ledger.cycles],
+    () => projectedCardPayments(ledger),
+    [ledger],
   );
   const projection = useMemo(
     () =>
