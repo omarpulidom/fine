@@ -575,8 +575,7 @@ export default function HomeTab() {
           onSelectCard={(cardId) =>
             router.push({ pathname: '/cards', params: { cardId } })
           }
-          onAddAccount={() => router.push('/accounts')}
-          onAddCard={() => router.push('/cards')}
+          onAdd={() => router.push('/accounts-and-cards')}
           onSimulate={() => router.push('/simulator')}
           onStatistics={() => router.push('/stats')}
           onHistory={() => router.push('/movements')}

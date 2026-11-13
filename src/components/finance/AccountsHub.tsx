@@ -1,8 +1,9 @@
 import { Feather } from '@expo/vector-icons'
 import { useState } from 'react'
-import { Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native'
+import { Pressable, Text, useWindowDimensions, View } from 'react-native'
 import Animated, {
   ReduceMotion,
+  type SharedValue,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
@@ -17,19 +18,99 @@ type Props = {
   balanceCents: number | null
   onSelectAccount: (id: string) => void
   onSelectCard: (id: string) => void
-  onAddAccount: () => void
-  onAddCard: () => void
+  onAdd: () => void
   onSimulate: () => void
   onStatistics: () => void
   onHistory: () => void
   onRegisterMovement: () => void
 }
 
+type WalletEntry = {
+  id: string
+  kind: 'account' | 'card'
+  name: string
+  amountCents: number
+  icon: 'briefcase' | 'dollar-sign' | 'credit-card'
+}
+
 const ink = '#101010'
-const muted = '#858585'
-const regular = 'Inter_400Regular'
 const medium = 'Inter_500Medium'
+const regular = 'Inter_400Regular'
 const semibold = 'Inter_600SemiBold'
+
+function WalletInstrumentCard({
+  entry,
+  index,
+  color,
+  iconColor,
+  baseTop,
+  lift,
+  width,
+  liftSpace,
+  expanded,
+  progress,
+  onPress,
+}: {
+  entry: WalletEntry
+  index: number
+  color: string
+  iconColor: string
+  baseTop: number
+  lift: number
+  width: number
+  liftSpace: number
+  expanded: boolean
+  progress: SharedValue<number>
+  onPress: () => void
+}) {
+  const animatedStyle = useAnimatedStyle(
+    () => ({
+      height: width * (index === 0 ? 0.4 : 0.38) + 42 * progress.value,
+      transform: [
+        {
+          translateY: -lift * progress.value,
+        },
+      ],
+    }),
+    [
+      lift,
+      width,
+      index,
+    ],
+  )
+
+  return (
+    <Animated.View
+      pointerEvents={expanded ? 'auto' : 'none'}
+      style={[
+        {
+          position: 'absolute',
+          top: liftSpace + baseTop,
+          left: 12,
+          width: width - 24,
+          zIndex: index + 2,
+          backgroundColor: color,
+          borderRadius: 15,
+        },
+        animatedStyle,
+      ]}
+    >
+      <Pressable
+        pointerEvents={expanded ? 'auto' : 'none'}
+        onPress={onPress}
+        accessibilityRole='button'
+        accessibilityLabel={`${entry.name}, ${formatMoney(entry.amountCents)}`}
+        style={{
+          flex: 1,
+          alignItems: 'flex-end',
+          padding: 10,
+        }}
+      >
+        <Feather name={entry.icon} size={index === 0 ? 16 : 15} color={iconColor} />
+      </Pressable>
+    </Animated.View>
+  )
+}
 
 export function AccountsHub({
   accounts,
@@ -37,8 +118,7 @@ export function AccountsHub({
   balanceCents,
   onSelectAccount,
   onSelectCard,
-  onAddAccount,
-  onAddCard,
+  onAdd,
   onSimulate,
   onStatistics,
   onHistory,
@@ -49,45 +129,40 @@ export function AccountsHub({
   const progress = useSharedValue(0)
   const available = width - 48
   const gap = 16
-  const walletWidth = (available - gap) / 2
-  const actionsWidth = walletWidth
-  const actionSize = Math.min(50, Math.floor((actionsWidth - 10) / 2))
+  const actionSize = 50
+  const actionsWidth = actionSize * 2 + 10
+  const walletWidth = available - actionsWidth - gap
+  const walletHeight = walletWidth * 0.78
+  const card = cards[0]
+  const account = accounts[0]
+  const visibleEntries: WalletEntry[] = [
+    {
+      id: card?.id ?? '',
+      kind: 'card',
+      name: card?.name ?? 'Tarjeta',
+      amountCents: card?.currentDebtCents ?? 0,
+      icon: 'credit-card',
+    },
+    {
+      id: account?.id ?? '',
+      kind: 'account',
+      name: account?.name ?? 'Cuenta',
+      amountCents: account?.balanceCents ?? 0,
+      icon: 'briefcase',
+    },
+  ]
+  const extraCount = accounts.length + cards.length - Number(!!account) - Number(!!card)
+  const liftSpace = 64
   const frontTop = walletWidth * 0.44
-  const tabPath = `M 0 30 L 0 22 H 18 Q 26 22 33 17 L 45 7 Q 50 2 57 2 H ${walletWidth - 57} Q ${walletWidth - 50} 2 ${walletWidth - 45} 7 L ${walletWidth - 33} 17 Q ${walletWidth - 26} 22 ${walletWidth - 18} 22 H ${walletWidth} V 30 Z`
-  const entryCount = accounts.length + cards.length + 1 + Number(accounts.length > 0)
-  const expandedHeight = Math.min(entryCount * 70 + 8, 292)
-  const panelStyle = useAnimatedStyle(
-    () => ({
-      height: progress.value * expandedHeight,
-      opacity: progress.value,
-    }),
-    [
-      expandedHeight,
-    ],
-  )
-  const cardsStyle = useAnimatedStyle(() => ({
+  const addStyle = useAnimatedStyle(() => ({
+    opacity: progress.value,
     transform: [
       {
-        translateY: (1 - progress.value) * 36,
+        scale: 0.7 + progress.value * 0.3,
       },
     ],
   }))
-
-  function toggle() {
-    const next = !expanded
-    setExpanded(next)
-    progress.value = withTiming(next ? 1 : 0, {
-      duration: 290,
-      reduceMotion: ReduceMotion.System,
-    })
-  }
-
-  function select(callback: () => void) {
-    setExpanded(false)
-    progress.value = 0
-    callback()
-  }
-
+  const tabPath = `M 0 30 L 0 22 H 18 Q 26 22 33 17 L 45 7 Q 50 2 57 2 H ${walletWidth - 57} Q ${walletWidth - 50} 2 ${walletWidth - 45} 7 L ${walletWidth - 33} 17 Q ${walletWidth - 26} 22 ${walletWidth - 18} 22 H ${walletWidth} V 30 Z`
   const actions = [
     {
       key: 'simulate',
@@ -115,13 +190,28 @@ export function AccountsHub({
     },
   ] as const
 
+  function toggle() {
+    const next = !expanded
+    setExpanded(next)
+    progress.value = withTiming(next ? 1 : 0, {
+      duration: 320,
+      reduceMotion: ReduceMotion.System,
+    })
+  }
+
+  function select(callback: () => void) {
+    setExpanded(false)
+    progress.value = 0
+    callback()
+  }
+
   return (
     <View
       style={{
         flexDirection: 'row',
-        alignItems: 'flex-start',
         gap,
-        marginTop: 32,
+        marginTop: 18,
+        height: liftSpace + walletHeight,
       }}
     >
       <View
@@ -129,8 +219,10 @@ export function AccountsHub({
           width: actionsWidth,
           flexDirection: 'row',
           flexWrap: 'wrap',
-          justifyContent: 'center',
+          justifyContent: 'flex-start',
+          alignContent: 'flex-start',
           gap: 10,
+          paddingTop: liftSpace,
         }}
       >
         {actions.map((action) => (
@@ -139,7 +231,6 @@ export function AccountsHub({
             onPress={action.onPress}
             accessibilityRole='button'
             accessibilityLabel={action.label}
-            hitSlop={4}
             style={{
               width: actionSize,
               height: actionSize,
@@ -160,202 +251,38 @@ export function AccountsHub({
       <View
         style={{
           width: walletWidth,
+          height: liftSpace + walletHeight,
+          position: 'relative',
+          overflow: 'visible',
         }}
       >
-        <Animated.View
-          pointerEvents={expanded ? 'auto' : 'none'}
-          style={[
-            {
-              overflow: 'hidden',
-            },
-            panelStyle,
-          ]}
-        >
-          <Animated.View style={cardsStyle}>
-            <ScrollView
-              nestedScrollEnabled
-              showsVerticalScrollIndicator={false}
+        {extraCount > 0 && expanded && (
+          <Pressable
+            onPress={() => select(onAdd)}
+            accessibilityRole='button'
+            accessibilityLabel='Ver todas las cuentas y tarjetas'
+            style={{
+              position: 'absolute',
+              top: 0,
+              right: 0,
+              zIndex: 15,
+              paddingVertical: 3,
+              paddingHorizontal: 7,
+              borderRadius: 7,
+              backgroundColor: '#e5e5e5',
+            }}
+          >
+            <Text
               style={{
-                maxHeight: expandedHeight,
-              }}
-              contentContainerStyle={{
-                paddingBottom: 8,
+                fontFamily: medium,
+                fontSize: 10,
+                color: ink,
               }}
             >
-              {accounts.map((account) => (
-                <Pressable
-                  key={`account-${account.id}`}
-                  onPress={() => select(() => onSelectAccount(account.id))}
-                  accessibilityRole='button'
-                  accessibilityLabel={`${account.name}, ${formatMoney(account.balanceCents)}`}
-                  style={{
-                    height: 64,
-                    backgroundColor: '#fff',
-                    borderRadius: 14,
-                    paddingHorizontal: 11,
-                    marginBottom: 6,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                  }}
-                >
-                  <Feather
-                    name={account.type === 'cash' ? 'dollar-sign' : 'briefcase'}
-                    size={17}
-                    color={ink}
-                    style={{
-                      marginRight: 9,
-                    }}
-                  />
-                  <View
-                    style={{
-                      flex: 1,
-                    }}
-                  >
-                    <Text
-                      numberOfLines={1}
-                      style={{
-                        fontFamily: medium,
-                        color: ink,
-                        fontSize: 12,
-                      }}
-                    >
-                      {account.name}
-                    </Text>
-                    <Text
-                      numberOfLines={1}
-                      style={{
-                        fontFamily: regular,
-                        color: muted,
-                        fontSize: 11,
-                        marginTop: 3,
-                      }}
-                    >
-                      {formatMoney(account.balanceCents)}
-                    </Text>
-                  </View>
-                </Pressable>
-              ))}
-              {cards.map((card) => (
-                <Pressable
-                  key={`card-${card.id}`}
-                  onPress={() => select(() => onSelectCard(card.id))}
-                  accessibilityRole='button'
-                  accessibilityLabel={`${card.name}, deuda ${formatMoney(card.currentDebtCents)}`}
-                  style={{
-                    height: 64,
-                    backgroundColor: '#e9e9e9',
-                    borderRadius: 14,
-                    paddingHorizontal: 11,
-                    marginBottom: 6,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                  }}
-                >
-                  <Feather
-                    name='credit-card'
-                    size={17}
-                    color={ink}
-                    style={{
-                      marginRight: 9,
-                    }}
-                  />
-                  <View
-                    style={{
-                      flex: 1,
-                    }}
-                  >
-                    <Text
-                      numberOfLines={1}
-                      style={{
-                        fontFamily: medium,
-                        color: ink,
-                        fontSize: 12,
-                      }}
-                    >
-                      {card.name}
-                    </Text>
-                    <Text
-                      numberOfLines={1}
-                      style={{
-                        fontFamily: regular,
-                        color: muted,
-                        fontSize: 11,
-                        marginTop: 3,
-                      }}
-                    >
-                      Deuda {formatMoney(card.currentDebtCents)}
-                    </Text>
-                  </View>
-                </Pressable>
-              ))}
-              <Pressable
-                onPress={() => select(onAddAccount)}
-                accessibilityRole='button'
-                accessibilityLabel='Añadir cuenta'
-                style={{
-                  height: 64,
-                  backgroundColor: '#fff',
-                  borderRadius: 14,
-                  paddingHorizontal: 11,
-                  marginBottom: 6,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                }}
-              >
-                <Feather
-                  name='plus'
-                  size={17}
-                  color={ink}
-                  style={{
-                    marginRight: 9,
-                  }}
-                />
-                <Text
-                  style={{
-                    fontFamily: medium,
-                    color: ink,
-                    fontSize: 12,
-                  }}
-                >
-                  Añadir cuenta
-                </Text>
-              </Pressable>
-              {!!accounts.length && (
-                <Pressable
-                  onPress={() => select(onAddCard)}
-                  accessibilityRole='button'
-                  accessibilityLabel='Añadir tarjeta'
-                  style={{
-                    height: 64,
-                    backgroundColor: '#e9e9e9',
-                    borderRadius: 14,
-                    paddingHorizontal: 11,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                  }}
-                >
-                  <Feather
-                    name='plus'
-                    size={17}
-                    color={ink}
-                    style={{
-                      marginRight: 9,
-                    }}
-                  />
-                  <Text
-                    style={{
-                      fontFamily: medium,
-                      color: ink,
-                      fontSize: 12,
-                    }}
-                  >
-                    Añadir tarjeta
-                  </Text>
-                </Pressable>
-              )}
-            </ScrollView>
-          </Animated.View>
-        </Animated.View>
+              Ver todas
+            </Text>
+          </Pressable>
+        )}
         <Pressable
           onPress={toggle}
           accessibilityRole='button'
@@ -364,95 +291,125 @@ export function AccountsHub({
             expanded,
           }}
           style={{
+            position: 'absolute',
+            top: liftSpace,
+            left: 0,
             width: walletWidth,
-            height: walletWidth,
+            height: walletHeight,
             borderRadius: 21,
             backgroundColor: ink,
-            overflow: 'hidden',
+          }}
+        />
+        {visibleEntries.map((entry, index) => (
+          <WalletInstrumentCard
+            key={`${entry.kind}-${entry.id}`}
+            entry={entry}
+            index={index}
+            color={index === 0 ? '#7c87bf' : '#f5f5f5'}
+            iconColor={index === 0 ? '#fff' : ink}
+            baseTop={index === 0 ? 10 : walletWidth * 0.24}
+            lift={index === 0 ? 72 : 28}
+            width={walletWidth}
+            liftSpace={liftSpace}
+            expanded={expanded}
+            progress={progress}
+            onPress={() => {
+              if (entry.id) {
+                select(() =>
+                  entry.kind === 'account' ? onSelectAccount(entry.id) : onSelectCard(entry.id),
+                )
+              }
+            }}
+          />
+        ))}
+        <Svg
+          width={walletWidth}
+          height={30}
+          pointerEvents='none'
+          style={{
+            position: 'absolute',
+            top: liftSpace + frontTop - 22,
+            left: 0,
+            zIndex: 10,
           }}
         >
-          <View
+          <Path d={tabPath} fill={ink} />
+        </Svg>
+        <Pressable
+          onPress={toggle}
+          accessibilityRole='button'
+          accessibilityLabel={expanded ? 'Ocultar cuentas' : 'Mostrar cuentas y tarjetas'}
+          accessibilityState={{
+            expanded,
+          }}
+          style={{
+            position: 'absolute',
+            top: liftSpace + frontTop,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 11,
+            backgroundColor: ink,
+            borderBottomLeftRadius: 21,
+            borderBottomRightRadius: 21,
+            justifyContent: 'flex-end',
+            padding: 12,
+          }}
+        >
+          <Text
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.65}
             style={{
-              position: 'absolute',
-              top: 10,
-              left: 12,
-              right: 12,
-              height: walletWidth * 0.4,
-              backgroundColor: '#7c87bf',
-              borderRadius: 15,
-              alignItems: 'flex-end',
-              padding: 10,
+              fontFamily: semibold,
+              fontSize: 22,
+              color: '#fff',
+              letterSpacing: -0.7,
             }}
           >
-            <Feather name='credit-card' size={16} color='#fff' />
-          </View>
-          <View
+            {balanceCents === null ? '—' : formatMoney(balanceCents)}
+          </Text>
+          <Text
+            numberOfLines={1}
             style={{
-              position: 'absolute',
-              top: walletWidth * 0.24,
-              left: 12,
-              right: 12,
-              height: walletWidth * 0.38,
-              backgroundColor: '#f5f5f5',
-              borderRadius: 15,
-              alignItems: 'flex-end',
-              padding: 10,
+              fontFamily: regular,
+              fontSize: 10,
+              color: '#adadad',
+              marginTop: 3,
             }}
           >
-            <Feather name='briefcase' size={15} color={ink} />
-          </View>
-          <Svg
-            width={walletWidth}
-            height={30}
-            pointerEvents='none'
-            style={{
-              position: 'absolute',
-              top: frontTop - 22,
-              left: 0,
-            }}
-          >
-            <Path d={tabPath} fill={ink} />
-          </Svg>
-          <View
-            style={{
-              position: 'absolute',
-              top: frontTop,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: ink,
-              borderTopLeftRadius: 22,
-              borderTopRightRadius: 22,
-              justifyContent: 'flex-end',
-              padding: 12,
-            }}
-          >
-            <Text
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.65}
-              style={{
-                fontFamily: semibold,
-                fontSize: 22,
-                color: '#fff',
-                letterSpacing: -0.7,
-              }}
-            >
-              {balanceCents === null ? '—' : formatMoney(balanceCents)}
-            </Text>
-            <Text
-              numberOfLines={1}
-              style={{
-                fontFamily: regular,
-                fontSize: 10,
-                color: '#adadad',
-                marginTop: 3,
-              }}
-            >
-              {balanceCents === null ? 'Añadir primera cuenta' : 'Saldo disponible'}
-            </Text>
-          </View>
+            {balanceCents === null ? 'Añadir primera cuenta' : 'Saldo disponible'}
+          </Text>
         </Pressable>
+        {expanded && (
+          <Animated.View
+            style={[
+              {
+                position: 'absolute',
+                right: 9,
+                bottom: 9,
+                zIndex: 12,
+              },
+              addStyle,
+            ]}
+          >
+            <Pressable
+              onPress={() => select(onAdd)}
+              accessibilityRole='button'
+              accessibilityLabel='Agregar cuenta o tarjeta de crédito'
+              style={{
+                width: 27,
+                height: 27,
+                borderRadius: 14,
+                backgroundColor: '#eeeeee',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Feather name='plus' size={16} color={ink} />
+            </Pressable>
+          </Animated.View>
+        )}
       </View>
     </View>
   )
