@@ -313,7 +313,7 @@ export default function HomeTab() {
         <View
           style={{
             alignItems: "center",
-            marginTop: 70,
+            marginTop: 42,
           }}
         >
           <Text
