@@ -24,7 +24,7 @@ La app no busca predecir hábitos ni estimar consumos futuros. Es una proyecció
 2. **Registro rápido de ingresos y gastos**: monto, fecha, cuenta/medio de pago y concepto opcional.
 3. **Movimientos programados**: únicos o recurrentes (por ejemplo, nómina, suscripciones, servicios).
 4. **Tarjetas de crédito**: corte, fecha límite, saldo facturado/deuda actual, compras y pagos.
-5. **Gráfica interactiva de liquidez**: navegar por días y consultar el saldo proyectado de cada fecha; horizontes sugeridos de 7, 30, 60 y 90 días.
+5. **Gráfica interactiva de liquidez**: navegar por días y consultar el saldo proyectado de cada fecha; horizontes de 30, 60, 90 y 180 días.
 6. **Historial de movimientos** con capacidad de editar o corregir registros.
 7. **Simulación de compra hipotética**: comparar la liquidez base con un escenario temporal sin guardar la compra como movimiento real.
 8. **Compras a meses sin intereses (MSI)**: distribuir una compra de crédito entre ciclos confirmados sin duplicar la deuda ni los pagos.
@@ -50,7 +50,7 @@ La gráfica de liquidez es el componente central:
 - En la proyección, tres trazos desde el saldo de hoy: saldo total en negro, saldo más ingresos acumulados en gris claro y saldo menos gastos acumulados en gris más oscuro. Los gastos incluyen pagos de tarjeta programados explícitamente. Un badge compacto muestra solo los ingresos y gastos no nulos del día elegido.
 - Permitir tocar/arrastrar sobre la curva para consultar **fecha + saldo**. Un arrastre iniciado en el área de la gráfica selecciona fechas sin mover el carrusel; fuera de la gráfica se puede deslizar entre sus páginas, y el desplazamiento vertical de la pantalla sigue disponible.
 - Mostrar cambios únicamente en días con movimientos previstos; una línea horizontal en periodos sin eventos.
-- Distinguir tramo histórico/actual y tramo proyectado.
+- Distinguir tramo histórico/actual y tramo proyectado. El ancho del tramo histórico crece con los días disponibles hasta un límite; con poco historial, la gráfica comienza cerca del borde izquierdo.
 - Mostrar próximos ingresos, gastos y pagos programados en una lista cronológica con filtro de todos, ingresos o gastos. Cada fila separa título e importe de fecha y acciones.
 - Acceso inmediato a **Añadir movimiento**.
 - Debajo de la fecha y el saldo principal, mostrar un carrusel horizontal de altura compartida que se ajusta al ancho de la cartera: primera página con la gráfica, leyenda y selector de periodos; segunda página con la cartera y los accesos. La fecha y el saldo principal permanecen fuera del carrusel, y la lista inferior no cambia de posición al deslizar. Al mostrar la cartera, la fecha seleccionada vuelve a hoy.

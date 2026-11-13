@@ -65,7 +65,7 @@ export default function HomeTab() {
     useState<ScheduledMovement | null>(null);
   const [selectedDay, setSelectedDay] = useState(0);
   const [badgeWidth, setBadgeWidth] = useState(80);
-  const [horizonDays, setHorizonDays] = useState<7 | 30 | 60 | 90>(30);
+  const [horizonDays, setHorizonDays] = useState<30 | 60 | 90 | 180>(30);
   const [today, setToday] = useState(() => new Date());
   useFocusEffect(
     useCallback(() => {
@@ -149,8 +149,11 @@ export default function HomeTab() {
         .reduce((sum, activity) => sum + activity.amountCents, 0);
 
   const chartPadding = 12;
-  const todayX = chartPadding + (chartWidth - chartPadding * 2) * 0.38;
-  const historyDays = history.length - 1;
+  const historyDays = Math.max(0, history.length - 1);
+  const historyWidth = historyDays
+    ? Math.min((chartWidth - chartPadding * 2) * 0.38, Math.max(28, historyDays * 8))
+    : 0;
+  const todayX = chartPadding + historyWidth;
   const selectedX =
     selectedDay < 0 && historyDays > 0
       ? todayX + (selectedDay / historyDays) * (todayX - chartPadding)
@@ -535,15 +538,6 @@ export default function HomeTab() {
                         fontSize: 12,
                       }}
                     >
-                      Hoy
-                    </Text>
-                    <Text
-                      style={{
-                        color: MUTED,
-                        fontFamily: font.regular,
-                        fontSize: 12,
-                      }}
-                    >
                       {horizonDays} días
                     </Text>
                   </View>
@@ -597,12 +591,12 @@ export default function HomeTab() {
                   style={{
                     flexDirection: "row",
                     justifyContent: "center",
-                    gap: 12,
+                    gap: 8,
                     marginTop: 8,
                     paddingBottom: 8,
                   }}
                 >
-                  {([7, 30, 60, 90] as const).map((days) => (
+                  {([30, 60, 90, 180] as const).map((days) => (
                     <Pressable
                       key={days}
                       onPress={() => {
@@ -610,7 +604,7 @@ export default function HomeTab() {
                         setSelectedDay((current) => Math.min(current, days));
                       }}
                       style={{
-                        paddingHorizontal: 14,
+                        paddingHorizontal: 11,
                         paddingVertical: 8,
                         borderRadius: 9,
                         backgroundColor:
