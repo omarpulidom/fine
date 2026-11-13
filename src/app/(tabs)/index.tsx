@@ -511,7 +511,7 @@ export default function HomeTab() {
           style={{
             flexDirection: "row",
             justifyContent: "center",
-            gap: 13,
+            gap: 20,
             marginTop: 7,
           }}
         >
@@ -554,8 +554,8 @@ export default function HomeTab() {
           style={{
             flexDirection: "row",
             justifyContent: "center",
-            gap: 7,
-            marginTop: 4,
+            gap: 12,
+            marginTop: 18,
           }}
         >
           {([7, 30, 60, 90] as const).map((days) => (
