@@ -1,4 +1,5 @@
-import { Feather } from '@expo/vector-icons'
+import * as Icon from '@/components/ui/PhosphorIcons'
+import { FinanceIcon } from '@/components/ui/FinanceIcon'
 import { useState } from 'react'
 import { Image, Pressable, Text, useWindowDimensions, View } from 'react-native'
 import Animated, {
@@ -64,6 +65,7 @@ function WalletInstrumentCard({
   iconColor,
   baseTop,
   lift,
+  scaleReduction,
   width,
   liftSpace,
   expanded,
@@ -76,6 +78,7 @@ function WalletInstrumentCard({
   iconColor: string
   baseTop: number
   lift: number
+  scaleReduction: number
   width: number
   liftSpace: number
   expanded: boolean
@@ -94,10 +97,14 @@ function WalletInstrumentCard({
         {
           translateY: -lift * progress.value,
         },
+        {
+          scale: 1 - scaleReduction * progress.value,
+        },
       ],
     }),
     [
       lift,
+      scaleReduction,
     ],
   )
 
@@ -144,7 +151,7 @@ function WalletInstrumentCard({
             }}
           />
         ) : (
-          <Feather name={entry.icon} size={index === 0 ? 16 : 15} color={iconColor} />
+          <FinanceIcon name={entry.icon} size={index === 0 ? 16 : 15} color={iconColor} />
         )}
       </Pressable>
     </Animated.View>
@@ -348,6 +355,7 @@ export function AccountsHub({
                     : walletWidth * 0.18
               }
               lift={visibleEntries.length === 3 && index === 1 ? 50 : index === 0 ? 72 : 28}
+              scaleReduction={(visibleEntries.length - 1 - index) * 0.03}
               width={walletWidth}
               liftSpace={liftSpace}
               expanded={expanded}
@@ -454,7 +462,7 @@ export function AccountsHub({
                 justifyContent: 'center',
               }}
             >
-              <Feather name='plus' size={20} color={ink} />
+              <Icon.PlusIcon size={20} color={ink} />
             </Pressable>
           </Animated.View>
         )}
@@ -484,7 +492,7 @@ export function AccountsHub({
               justifyContent: 'center',
             }}
           >
-            <Feather
+            <FinanceIcon
               name={action.icon}
               size={Math.max(17, Math.min(21, actionSize * 0.4))}
               color={ink}
