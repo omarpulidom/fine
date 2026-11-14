@@ -39,6 +39,7 @@ type WalletEntry = {
 }
 
 const ink = '#101010'
+const walletBackground = '#292929'
 const medium = 'Inter_500Medium'
 const regular = 'Inter_400Regular'
 const semibold = 'Inter_600SemiBold'
@@ -46,6 +47,7 @@ const hubTopMargin = 0
 const liftSpace = 64
 const actionRowGap = 16
 const walletHeightRatio = 0.66
+const cardAspectRatio = 817 / 511
 
 function getActionSize(width: number) {
   return Math.min(50, Math.floor((width - 64) / 5))
@@ -84,9 +86,10 @@ function WalletInstrumentCard({
     entry.kind === 'card'
       ? getCardDesign(entry.cardDesignId)?.image
       : getAccountDesign(entry.accountDesignId)?.image
+  const cardWidth = width - 24
+  const cardHeight = cardWidth / cardAspectRatio
   const animatedStyle = useAnimatedStyle(
     () => ({
-      height: width * (index === 0 ? 0.4 : 0.38) + 42 * progress.value,
       transform: [
         {
           translateY: -lift * progress.value,
@@ -95,8 +98,6 @@ function WalletInstrumentCard({
     }),
     [
       lift,
-      width,
-      index,
     ],
   )
 
@@ -108,7 +109,8 @@ function WalletInstrumentCard({
           position: 'absolute',
           top: liftSpace + baseTop,
           left: 12,
-          width: width - 24,
+          width: cardWidth,
+          height: cardHeight,
           zIndex: index + 2,
           backgroundColor: color,
           borderRadius: 15,
@@ -131,13 +133,13 @@ function WalletInstrumentCard({
         {cardImage ? (
           <Image
             source={cardImage}
-            resizeMode='cover'
+            resizeMode='contain'
             style={{
               position: 'absolute',
               top: 0,
               left: 0,
-              width: width - 24,
-              height: ((width - 24) * 511) / 817,
+              width: cardWidth,
+              height: cardHeight,
               borderRadius: 15,
             }}
           />
@@ -315,39 +317,51 @@ export function AccountsHub({
             width: walletWidth,
             height: walletHeight,
             borderRadius: 21,
-            backgroundColor: ink,
+            backgroundColor: walletBackground,
           }}
         />
-        {visibleEntries.map((entry, index) => (
-          <WalletInstrumentCard
-            key={`${entry.kind}-${entry.id}`}
-            entry={entry}
-            index={index}
-            color={index === 0 ? '#7c87bf' : index === 1 ? '#f5f5f5' : '#e7e7e7'}
-            iconColor={index === 0 ? '#fff' : ink}
-            baseTop={
-              visibleEntries.length === 3
-                ? index === 0
-                  ? 10
-                  : walletWidth * index * 0.115
-                : index === 0
-                  ? 10
-                  : walletWidth * 0.18
-            }
-            lift={visibleEntries.length === 3 && index === 1 ? 50 : index === 0 ? 72 : 28}
-            width={walletWidth}
-            liftSpace={liftSpace}
-            expanded={expanded}
-            progress={progress}
-            onPress={() => {
-              if (entry.id) {
-                select(() =>
-                  entry.kind === 'account' ? onSelectAccount(entry.id) : onSelectCard(entry.id),
-                )
+        <View
+          pointerEvents='box-none'
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: walletWidth,
+            height: liftSpace + walletHeight,
+            overflow: 'hidden',
+          }}
+        >
+          {visibleEntries.map((entry, index) => (
+            <WalletInstrumentCard
+              key={`${entry.kind}-${entry.id}`}
+              entry={entry}
+              index={index}
+              color={index === 0 ? '#7c87bf' : index === 1 ? '#f5f5f5' : '#e7e7e7'}
+              iconColor={index === 0 ? '#fff' : ink}
+              baseTop={
+                visibleEntries.length === 3
+                  ? index === 0
+                    ? 10
+                    : walletWidth * index * 0.115
+                  : index === 0
+                    ? 10
+                    : walletWidth * 0.18
               }
-            }}
-          />
-        ))}
+              lift={visibleEntries.length === 3 && index === 1 ? 50 : index === 0 ? 72 : 28}
+              width={walletWidth}
+              liftSpace={liftSpace}
+              expanded={expanded}
+              progress={progress}
+              onPress={() => {
+                if (entry.id) {
+                  select(() =>
+                    entry.kind === 'account' ? onSelectAccount(entry.id) : onSelectCard(entry.id),
+                  )
+                }
+              }}
+            />
+          ))}
+        </View>
         <Pressable
           onPress={toggle}
           accessibilityRole='button'
