@@ -1,5 +1,5 @@
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Platform, Pressable, type StyleProp, Text, View, type ViewStyle } from 'react-native'
 import { AppBottomSheet } from '@/components/ui/AppBottomSheet'
 import { formatDateDisplay, isDateKey, localDateKey } from '@/features/finance/dates'
@@ -33,6 +33,7 @@ export function DateField({
 }: Props) {
   const [visible, setVisible] = useState(false)
   const [draft, setDraft] = useState(new Date())
+  const pendingDate = useRef<string | null>(null)
   const min = minimumDate ? toDate(minimumDate) : undefined
   const max = maximumDate ? toDate(maximumDate) : undefined
 
@@ -58,6 +59,13 @@ export function DateField({
 
   const display = toDate(value)
   const formatted = display ? formatDateDisplay(display) : placeholder
+
+  function closePicker() {
+    setVisible(false)
+    const selected = pendingDate.current
+    pendingDate.current = null
+    if (selected) onChange(selected)
+  }
 
   return (
     <View
@@ -121,7 +129,7 @@ export function DateField({
       {Platform.OS === 'ios' && (
         <AppBottomSheet
           visible={visible}
-          onClose={() => setVisible(false)}
+          onClose={closePicker}
         >
           <Text
             style={{
@@ -148,7 +156,7 @@ export function DateField({
           />
           <Pressable
             onPress={() => {
-              onChange(localDateKey(draft))
+              pendingDate.current = localDateKey(draft)
               setVisible(false)
             }}
             style={{

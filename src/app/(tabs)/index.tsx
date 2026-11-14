@@ -1,4 +1,4 @@
-import { Feather } from "@expo/vector-icons";
+import * as Icon from "@/components/ui/PhosphorIcons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import { useCallback, useMemo, useRef, useState } from "react";
@@ -25,14 +25,12 @@ import {
 } from "@/features/finance/ledger";
 import { formatMoney } from "@/features/finance/money";
 import { projectLiquidityBreakdown } from "@/features/finance/projection";
-import { ScheduledMovementModal } from "@/features/finance/ScheduledMovementModal";
 import {
   deleteScheduledMovement,
   getScheduledMovements,
   getSkippedOccurrences,
   nextOccurrenceDate,
   type ScheduledMovement,
-  saveScheduledMovement,
   skipScheduledOccurrence,
 } from "@/features/finance/scheduledMovements";
 
@@ -64,9 +62,6 @@ export default function HomeTab() {
     getScheduledMovements,
   );
   const [skippedOccurrences, setSkippedOccurrences] = useState(getSkippedOccurrences);
-  const [movementModalVisible, setMovementModalVisible] = useState(false);
-  const [editingScheduled, setEditingScheduled] =
-    useState<ScheduledMovement | null>(null);
   const [selectedDay, setSelectedDay] = useState(0);
   const [badgeWidth, setBadgeWidth] = useState(80);
   const [horizonDays, setHorizonDays] = useState<30 | 60 | 90 | 180>(30);
@@ -220,17 +215,6 @@ export default function HomeTab() {
   function selectCarouselPage(page: 0 | 1) {
     setCarouselPage(page);
     if (page === 1) setSelectedDay(0);
-  }
-
-  function addMovement(draft: Omit<ScheduledMovement, "id">) {
-    setMovements(
-      saveScheduledMovement({
-        ...draft,
-        id:
-          editingScheduled?.id ??
-          `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`,
-      }),
-    );
   }
 
   function confirmDeleteMovement(movement: ScheduledMovement, occurrenceDate: string) {
@@ -699,8 +683,8 @@ export default function HomeTab() {
             completedOccurrences={completedOccurrences}
             todayKey={todayKey}
             onEdit={(movement) => {
-              setEditingScheduled(movement);
-              setMovementModalVisible(true);
+              router.push({ pathname: "/scheduled-movement-form",
+                params: { movementId: movement.id } });
             }}
             onComplete={confirmCompleteMovement}
             onDelete={confirmDeleteMovement}
@@ -713,8 +697,7 @@ export default function HomeTab() {
                 router.push("/accounts");
                 return;
               }
-              setEditingScheduled(null);
-              setMovementModalVisible(true);
+              router.push("/scheduled-movement-form");
             }}
             accessibilityRole="button"
             style={{
@@ -728,7 +711,7 @@ export default function HomeTab() {
               gap: 8,
             }}
           >
-            <Feather name="plus" size={18} color="#fff" />
+            <Icon.PlusIcon size={18} color="#fff" />
             <Text
               style={{
                 color: "#fff",
@@ -743,18 +726,6 @@ export default function HomeTab() {
           </Pressable>
         </View>
       </ScrollView>
-
-      <ScheduledMovementModal
-        visible={movementModalVisible}
-        todayKey={todayKey}
-        accounts={ledger.accounts}
-        initial={editingScheduled}
-        onClose={() => {
-          setMovementModalVisible(false);
-          setEditingScheduled(null);
-        }}
-        onSave={addMovement}
-      />
 
     </SafeAreaView>
   );

@@ -1,4 +1,4 @@
-import { Feather } from '@expo/vector-icons'
+import * as Icon from '@/components/ui/PhosphorIcons'
 import { useFocusEffect, useRouter } from 'expo-router'
 import { useCallback, useMemo, useState } from 'react'
 import { Alert, Pressable, ScrollView, Text, View } from 'react-native'
@@ -6,14 +6,12 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { ScheduledMovementsList } from '@/components/finance/ScheduledMovementsList'
 import { localDateKey } from '@/features/finance/dates'
 import { getLedger, newMovementId, upsertCompletedMovement } from '@/features/finance/ledger'
-import { ScheduledMovementModal } from '@/features/finance/ScheduledMovementModal'
 import {
   deleteScheduledMovement,
   getScheduledMovements,
   getSkippedOccurrences,
   nextOccurrenceDate,
   type ScheduledMovement,
-  saveScheduledMovement,
   skipScheduledOccurrence,
 } from '@/features/finance/scheduledMovements'
 
@@ -23,8 +21,6 @@ export default function ScheduledMovementsScreen() {
   const [movements, setMovements] = useState(getScheduledMovements)
   const [skippedOccurrences, setSkippedOccurrences] = useState(getSkippedOccurrences)
   const [todayKey, setTodayKey] = useState(() => localDateKey(new Date()))
-  const [editing, setEditing] = useState<ScheduledMovement | null>(null)
-  const [modalVisible, setModalVisible] = useState(false)
 
   useFocusEffect(
     useCallback(() => {
@@ -48,15 +44,6 @@ export default function ScheduledMovementsScreen() {
       skippedOccurrences,
     ],
   )
-
-  function saveMovement(draft: Omit<ScheduledMovement, 'id'>) {
-    setMovements(
-      saveScheduledMovement({
-        ...draft,
-        id: editing?.id ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`,
-      }),
-    )
-  }
 
   function deleteMovement(movement: ScheduledMovement, occurrenceDate: string) {
     const removeAll = () => {
@@ -164,7 +151,7 @@ export default function ScheduledMovementsScreen() {
             padding: 3,
           }}
         >
-          <Feather name='arrow-left' size={23} color='#101010' />
+          <Icon.ArrowLeftIcon size={23} color='#101010' />
         </Pressable>
         <Text
           style={{
@@ -194,8 +181,8 @@ export default function ScheduledMovementsScreen() {
           completedOccurrences={completedOccurrences}
           todayKey={todayKey}
           onEdit={(movement) => {
-            setEditing(movement)
-            setModalVisible(true)
+            router.push({ pathname: '/scheduled-movement-form',
+              params: { movementId: movement.id } })
           }}
           onComplete={completeMovement}
           onDelete={deleteMovement}
@@ -209,17 +196,6 @@ export default function ScheduledMovementsScreen() {
           }
         />
       </ScrollView>
-      <ScheduledMovementModal
-        visible={modalVisible}
-        todayKey={todayKey}
-        accounts={ledger.accounts}
-        initial={editing}
-        onClose={() => {
-          setModalVisible(false)
-          setEditing(null)
-        }}
-        onSave={saveMovement}
-      />
     </SafeAreaView>
   )
 }

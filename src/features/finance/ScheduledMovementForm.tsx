@@ -1,7 +1,5 @@
-import { BottomSheetTextInput as TextInput } from '@gorhom/bottom-sheet'
 import { useEffect, useState } from 'react'
-import { Pressable, ScrollView, Text, View } from 'react-native'
-import { AppBottomSheet } from '@/components/ui/AppBottomSheet'
+import { Pressable, ScrollView, Text, TextInput, View } from 'react-native'
 import { DateField } from '@/components/ui/DateField'
 import { addDaysKey, isDateKey } from './dates'
 import type { LiquidAccount } from './ledger'
@@ -11,11 +9,9 @@ import type { ScheduledMovement } from './scheduledMovements'
 type DraftMovement = Omit<ScheduledMovement, 'id'>
 
 type Props = {
-  visible: boolean
   todayKey: string
   accounts: LiquidAccount[]
   initial?: ScheduledMovement | null
-  onClose: () => void
   onSave: (movement: DraftMovement) => void
 }
 
@@ -25,12 +21,10 @@ const regular = 'Inter_400Regular'
 const medium = 'Inter_500Medium'
 const semibold = 'Inter_600SemiBold'
 
-export function ScheduledMovementModal({
-  visible,
+export function ScheduledMovementForm({
   todayKey,
   accounts,
   initial,
-  onClose,
   onSave,
 }: Props) {
   const [type, setType] = useState<DraftMovement['type']>('expense')
@@ -55,7 +49,6 @@ export function ScheduledMovementModal({
         ]
 
   useEffect(() => {
-    if (!visible) return
     setType(initial?.type ?? 'expense')
     setAmount(initial ? formatMoneyInput((initial.amountCents / 100).toFixed(2)) : '')
     setDescription(initial?.description ?? '')
@@ -66,7 +59,6 @@ export function ScheduledMovementModal({
     setEndDateInput(initial?.endDate ?? '')
     setError('')
   }, [
-    visible,
     accounts,
     initial,
     todayKey,
@@ -101,32 +93,26 @@ export function ScheduledMovementModal({
       return
     }
 
-    onSave({
-      type,
-      amountCents,
-      accountId,
-      counterpartyAccountId: type === 'transfer' ? counterpartyAccountId : undefined,
-      effectiveDate,
-      recurrence,
-      endDate: recurrence && endDateInput.trim() ? endDateInput.trim() : undefined,
-      description: description.trim(),
-    })
-    onClose()
+    try {
+      onSave({
+        type,
+        amountCents,
+        accountId,
+        counterpartyAccountId: type === 'transfer' ? counterpartyAccountId : undefined,
+        effectiveDate,
+        recurrence,
+        endDate: recurrence && endDateInput.trim() ? endDateInput.trim() : undefined,
+        description: description.trim(),
+      })
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'No se pudo guardar el movimiento.')
+    }
   }
 
   return (
-    <AppBottomSheet
-      visible={visible}
-      onClose={onClose}
-    >
+    <View>
       <View>
-        <View
-          style={{
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}
-        >
+        <View>
           <Text
             style={{
               fontFamily: semibold,
@@ -136,17 +122,6 @@ export function ScheduledMovementModal({
           >
             {initial ? 'Editar movimiento' : 'Programar movimiento'}
           </Text>
-          <Pressable onPress={onClose} accessibilityRole='button' accessibilityLabel='Cerrar'>
-            <Text
-              style={{
-                fontFamily: regular,
-                fontSize: 25,
-                color: MUTED,
-              }}
-            >
-              ×
-            </Text>
-          </Pressable>
         </View>
         <Text
           style={{
@@ -201,7 +176,6 @@ export function ScheduledMovementModal({
           Importe
         </Text>
         <TextInput
-          autoFocus
           keyboardType='decimal-pad'
           value={amount}
           onChangeText={(value) => {
@@ -463,6 +437,6 @@ export function ScheduledMovementModal({
           </Text>
         </Pressable>
       </View>
-    </AppBottomSheet>
+    </View>
   )
 }
