@@ -19,6 +19,7 @@ import { AppBottomSheet } from '@/components/ui/AppBottomSheet'
 import { InstrumentCardCarousel } from '@/components/finance/InstrumentCardCarousel'
 import { InstrumentDetailHeader } from '@/components/finance/InstrumentDetailHeader'
 import { InstrumentDetailMorph } from '@/components/finance/InstrumentDetailMorph'
+import { useInstrumentDetailTransition } from '@/components/finance/InstrumentDetailTransition'
 import {
   type AccountDesignId,
   accountDesigns,
@@ -45,11 +46,13 @@ export default function AccountsScreen() {
   const router = useRouter()
   const { width: screenWidth } = useWindowDimensions()
   const designPageWidth = screenWidth - 48
-  const { accountId, create, swipe } = useLocalSearchParams<{
+  const { accountId, create, swipe, fromList } = useLocalSearchParams<{
     accountId?: string
     create?: string
     swipe?: string
+    fromList?: string
   }>()
+  const { hasListOrigin, closeToList } = useInstrumentDetailTransition()
   const [ledger, setLedger] = useState(getLedger)
   useFocusEffect(useCallback(() => setLedger(getLedger()), []))
   const [editing, setEditing] = useState<LiquidAccount | null | undefined>(
@@ -68,6 +71,17 @@ export default function AccountsScreen() {
     .filter((movement) => movement.accountId === accountId ||
       movement.counterpartyAccountId === accountId)
     .sort((left, right) => right.effectiveDate.localeCompare(left.effectiveDate))
+
+  function closeDetail() {
+    if (selectedAccount && hasListOrigin && closeToList({
+      instrument: { kind: 'account', id: selectedAccount.id },
+      name: selectedAccount.name,
+      image: getAccountDesign(selectedAccount.accountDesignId)?.image,
+      navigate: () => router.back(),
+    })) return
+    if (accountId || create === '1') router.back()
+    else router.replace('/accounts-and-cards')
+  }
 
   function open(account: LiquidAccount | null) {
     setEditing(account)
@@ -151,7 +165,8 @@ export default function AccountsScreen() {
 
   return (
     <>
-    <Stack.Screen options={{ animation: swipe === '1' ? 'none' : 'default' }} />
+    <Stack.Screen options={{ animation: swipe === '1' || fromList === '1' || hasListOrigin
+      ? 'none' : 'default' }} />
     <SafeAreaView
       style={{
         flex: 1,
@@ -160,8 +175,7 @@ export default function AccountsScreen() {
     >
       <View style={{ height: 70, paddingHorizontal: 24, justifyContent: 'center' }}>
         <Pressable
-          onPress={() => accountId || create === '1'
-            ? router.back() : router.replace('/accounts-and-cards')}
+          onPress={closeDetail}
           accessibilityRole='button'
           accessibilityLabel='Cerrar detalle'
           style={{ alignSelf: 'flex-start', padding: 3 }}

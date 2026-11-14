@@ -1,9 +1,10 @@
 import { Feather } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
 import { useRouter } from 'expo-router'
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { Image, type ImageSourcePropType, Pressable, ScrollView, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { type InstrumentRect, useInstrumentDetailTransition } from '@/components/finance/InstrumentDetailTransition'
 import { getAccountDesign } from '@/features/finance/accountDesigns'
 import { getCardDesign } from '@/features/finance/cardDesigns'
 import { getLedger } from '@/features/finance/ledger'
@@ -22,17 +23,32 @@ function InstrumentListRow({
   isCreditCard,
   image,
   onPress,
+  onMeasure,
+  hidden,
 }: {
   name: string
   bank: string
   amountCents: number
   isCreditCard: boolean
   image?: ImageSourcePropType | null
-  onPress: () => void
+  onPress: (rect: InstrumentRect | null) => void
+  onMeasure: (rect: InstrumentRect) => void
+  hidden: boolean
 }) {
+  const artRef = useRef<View>(null)
+  function measure(callback: (rect: InstrumentRect | null) => void) {
+    if (!artRef.current) {
+      callback(null)
+      return
+    }
+    artRef.current.measureInWindow((x, y, width, height) => {
+      callback(width > 0 && height > 0 ? { x, y, width, height } : null)
+    })
+  }
+
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => measure(onPress)}
       accessibilityRole='button'
       accessibilityLabel={`${name}, ${bank}, ${isCreditCard ? 'deuda actual' : 'saldo actual'} ${formatMoney(amountCents)}`}
       style={{
@@ -43,7 +59,11 @@ function InstrumentListRow({
         gap: 13,
       }}
     >
-      <View style={{
+      <View ref={artRef} collapsable={false}
+        onLayout={() => requestAnimationFrame(() => measure((rect) => {
+          if (rect) onMeasure(rect)
+        }))}
+        style={{
         width: 54,
         height: 35,
         borderRadius: 6,
@@ -51,6 +71,7 @@ function InstrumentListRow({
         alignItems: 'center',
         justifyContent: 'center',
         overflow: 'hidden',
+        opacity: hidden ? 0 : 1,
       }}>
         {image ? (
           <Image source={image} resizeMode='contain' style={{ width: 54, height: 35 }} />
@@ -83,7 +104,23 @@ function InstrumentListRow({
 export default function AccountsAndCardsScreen() {
   const router = useRouter()
   const [ledger, setLedger] = useState(getLedger)
-  useFocusEffect(useCallback(() => setLedger(getLedger()), []))
+  const { registerRow, openFromList, hiddenKey, clearOriginIfIdle } = useInstrumentDetailTransition()
+  useFocusEffect(useCallback(() => {
+    setLedger(getLedger())
+    clearOriginIfIdle()
+  }, [clearOriginIfIdle]))
+
+  function openInstrument(kind: 'account' | 'card', id: string, name: string,
+    image: ImageSourcePropType | null | undefined, rect: InstrumentRect | null) {
+    const navigate = () => router.push(kind === 'account'
+      ? { pathname: '/accounts', params: { accountId: id, fromList: '1' } }
+      : { pathname: '/cards', params: { cardId: id, fromList: '1' } })
+    if (!rect) {
+      navigate()
+      return
+    }
+    openFromList({ instrument: { kind, id }, name, image, rect, navigate })
+  }
 
   return (
     <SafeAreaView
@@ -142,8 +179,10 @@ export default function AccountsAndCardsScreen() {
                 amountCents={account.balanceCents}
                 isCreditCard={false}
                 image={getAccountDesign(account.accountDesignId)?.image}
-                onPress={() => router.push({ pathname: '/accounts',
-                  params: { accountId: account.id } })}
+                onPress={(rect) => openInstrument('account', account.id, account.name,
+                  getAccountDesign(account.accountDesignId)?.image, rect)}
+                onMeasure={(rect) => registerRow('account', account.id, rect)}
+                hidden={hiddenKey === `account:${account.id}`}
               />
             </View>
           )) : (
@@ -175,8 +214,10 @@ export default function AccountsAndCardsScreen() {
                 amountCents={card.currentDebtCents}
                 isCreditCard
                 image={getCardDesign(card.cardDesignId)?.image}
-                onPress={() => router.push({ pathname: '/cards',
-                  params: { cardId: card.id } })}
+                onPress={(rect) => openInstrument('card', card.id, card.name,
+                  getCardDesign(card.cardDesignId)?.image, rect)}
+                onMeasure={(rect) => registerRow('card', card.id, rect)}
+                hidden={hiddenKey === `card:${card.id}`}
               />
             </View>
           )) : (

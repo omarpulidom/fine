@@ -20,6 +20,7 @@ import { DateField } from '@/components/ui/DateField'
 import { InstrumentCardCarousel } from '@/components/finance/InstrumentCardCarousel'
 import { InstrumentDetailHeader } from '@/components/finance/InstrumentDetailHeader'
 import { InstrumentDetailMorph } from '@/components/finance/InstrumentDetailMorph'
+import { useInstrumentDetailTransition } from '@/components/finance/InstrumentDetailTransition'
 import { cutoffForMonth, previousCutoffMonth } from '@/features/finance/billingCalendar'
 import { type CardDesignId, cardDesigns, getCardDesign } from '@/features/finance/cardDesigns'
 import { addDaysKey, addMonthsKey, formatShortDateKey, isDateKey, localDateKey } from '@/features/finance/dates'
@@ -132,11 +133,13 @@ export default function CardsScreen() {
   const router = useRouter()
   const { width: screenWidth } = useWindowDimensions()
   const designPageWidth = screenWidth - 48
-  const { cardId: focusedCardId, create, swipe } = useLocalSearchParams<{
+  const { cardId: focusedCardId, create, swipe, fromList } = useLocalSearchParams<{
     cardId?: string
     create?: string
     swipe?: string
+    fromList?: string
   }>()
+  const { hasListOrigin, closeToList } = useInstrumentDetailTransition()
   const [ledger, setLedger] = useState(getLedger)
   useFocusEffect(
     useCallback(() => {
@@ -182,6 +185,18 @@ export default function CardsScreen() {
     .filter((cycle) => statementAmountCents(ledger, cycle.id) > cycle.paidAmountCents)
     .sort((a, b) => comparePaymentCycles(a, b, todayKey))
   const visibleCards = ledger.cards.filter((card) => card.id === focusedCardId)
+
+  function closeDetail() {
+    const card = visibleCards[0]
+    if (card && hasListOrigin && closeToList({
+      instrument: { kind: 'card', id: card.id },
+      name: card.name,
+      image: getCardDesign(card.cardDesignId)?.image,
+      navigate: () => router.back(),
+    })) return
+    if (focusedCardId || create === '1') router.back()
+    else router.replace('/accounts-and-cards')
+  }
 
   function open(
     nextMode: FormMode,
@@ -478,7 +493,8 @@ export default function CardsScreen() {
 
   return (
     <>
-    <Stack.Screen options={{ animation: swipe === '1' ? 'none' : 'default' }} />
+    <Stack.Screen options={{ animation: swipe === '1' || fromList === '1' || hasListOrigin
+      ? 'none' : 'default' }} />
     <SafeAreaView
       style={{
         flex: 1,
@@ -487,8 +503,7 @@ export default function CardsScreen() {
     >
       <View style={{ height: 70, paddingHorizontal: 24, justifyContent: 'center' }}>
         <Pressable
-          onPress={() => focusedCardId || create === '1'
-            ? router.back() : router.replace('/accounts-and-cards')}
+          onPress={closeDetail}
           accessibilityRole='button'
           accessibilityLabel='Cerrar detalle'
           style={{ alignSelf: 'flex-start', padding: 3 }}

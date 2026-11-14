@@ -7,6 +7,7 @@ import { useEffect } from 'react'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { AppFonts } from '@/components/fonts/fonts'
 import { AppProviders } from '@/components/Providers/AppProviders'
+import { InstrumentDetailTransitionProvider } from '@/components/finance/InstrumentDetailTransition'
 
 SplashScreen.preventAutoHideAsync()
 
@@ -46,7 +47,9 @@ export default function RootLayout() {
     >
       <StatusBar style='dark' backgroundColor='#f6f6f6' />
       <AppProviders>
-        <RootStack />
+        <InstrumentDetailTransitionProvider>
+          <RootStack />
+        </InstrumentDetailTransitionProvider>
       </AppProviders>
     </GestureHandlerRootView>
   )
