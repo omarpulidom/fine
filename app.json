@@ -4,7 +4,10 @@
     "slug": "fine",
     "version": "0.0.1",
     "scheme": "fine",
-    "platforms": ["ios", "android"],
+    "platforms": [
+      "ios",
+      "android"
+    ],
     "plugins": [
       "expo-dev-client",
       "expo-router",
@@ -12,7 +15,9 @@
       [
         "expo-asset",
         {
-          "assets": ["./src/assets/images"]
+          "assets": [
+            "./src/assets/images"
+          ]
         }
       ],
       [
@@ -37,14 +42,17 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.pm.fine",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       },
-      "buildNumber": "1"
+      "buildNumber": "1",
+      "appleTeamId": "C5TXZNQR66"
     },
     "android": {
       "adaptiveIcon": {
