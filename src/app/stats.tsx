@@ -160,8 +160,8 @@ export default function StatsScreen() {
         >
           <Text
             style={{
-              fontFamily: regular,
-              color: muted,
+              fontFamily: medium,
+              color: ink,
               fontSize: 13,
             }}
           >
@@ -283,8 +283,8 @@ export default function StatsScreen() {
         >
           <Text
             style={{
-              fontFamily: regular,
-              color: muted,
+              fontFamily: medium,
+              color: ink,
               fontSize: 13,
               marginBottom: 3,
             }}

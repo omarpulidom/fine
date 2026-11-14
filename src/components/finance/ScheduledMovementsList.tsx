@@ -2,6 +2,7 @@ import * as Icon from '@/components/ui/PhosphorIcons'
 import { FinanceIcon } from '@/components/ui/FinanceIcon'
 import { useMemo, useState } from 'react'
 import { Pressable, ScrollView, Text, View } from 'react-native'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { formatDateDisplay, formatShortDateKey } from '@/features/finance/dates'
 import { type Ledger, statementAmountCents } from '@/features/finance/ledger'
 import { formatMoney } from '@/features/finance/money'
@@ -163,7 +164,7 @@ export function ScheduledMovementsList({
   return (
     <View>
       {mode === 'carousel' && (
-        <Text style={{ color: muted, fontFamily: regular, fontSize: 14 }}>
+        <Text style={{ color: ink, fontFamily: medium, fontSize: 14 }}>
           Movimientos programados
         </Text>
       )}
@@ -200,26 +201,12 @@ export function ScheduledMovementsList({
         <View
           style={{
             marginTop: 9,
-            minHeight: 74,
-            borderRadius: 13,
-            backgroundColor: '#fff',
-            alignItems: 'center',
-            justifyContent: 'center',
-            paddingHorizontal: 20,
           }}
         >
-          <Text
-            style={{
-              color: muted,
-              fontFamily: regular,
-              fontSize: 13,
-              textAlign: 'center',
-            }}
-          >
-            {selectedFilters.includes('all')
-              ? 'Aún no hay movimientos programados'
-              : 'No hay movimientos con estos filtros'}
-          </Text>
+          <EmptyState
+            message={selectedFilters.includes('all')
+              ? 'Los próximos ingresos y gastos aparecerán aquí.'
+              : 'No hay movimientos con estos filtros.'} compact />
         </View>
       ) : mode === 'carousel' ? (
         <ScrollView

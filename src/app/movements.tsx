@@ -6,6 +6,7 @@ import { Alert, Pressable, ScrollView, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { AppBottomSheet } from '@/components/ui/AppBottomSheet'
 import { DateField } from '@/components/ui/DateField'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { formatShortDateKey, isDateKey, localDateKey } from '@/features/finance/dates'
 import {
   type CompletedMovement,
@@ -212,23 +213,8 @@ export default function MovementsScreen() {
           </Text>
         </Pressable>
         {sorted.length === 0 && (
-          <View
-            style={{
-              marginTop: 18,
-              padding: 24,
-              borderRadius: 12,
-              backgroundColor: '#fff',
-            }}
-          >
-            <Text
-              style={{
-                fontFamily: regular,
-                color: MUTED,
-                textAlign: 'center',
-              }}
-            >
-              Aún no hay movimientos realizados
-            </Text>
+          <View style={{ marginTop: 18 }}>
+            <EmptyState message='Los movimientos que registres aparecerán aquí.' />
           </View>
         )}
         {sorted.map((movement) => {

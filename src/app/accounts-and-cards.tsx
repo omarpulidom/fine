@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router'
 import { useCallback, useRef, useState } from 'react'
 import { Image, type ImageSourcePropType, Pressable, ScrollView, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { type InstrumentRect, useInstrumentDetailTransition } from '@/components/finance/InstrumentDetailTransition'
 import { getAccountDesign } from '@/features/finance/accountDesigns'
 import { getCardDesign } from '@/features/finance/cardDesigns'
@@ -160,7 +161,7 @@ export default function AccountsAndCardsScreen() {
         <Text
           style={{
             fontFamily: medium,
-            color: muted,
+            color: ink,
             fontSize: 13,
             marginTop: 30,
             marginBottom: 10,
@@ -168,8 +169,9 @@ export default function AccountsAndCardsScreen() {
         >
           Tus cuentas
         </Text>
-        <View style={{ backgroundColor: '#fff', borderRadius: 18,
-          borderWidth: 1, borderColor: '#ededed', overflow: 'hidden' }}>
+        <View style={{ backgroundColor: ledger.accounts.length ? '#fff' : 'transparent',
+          borderRadius: 18, borderWidth: ledger.accounts.length ? 1 : 0,
+          borderColor: '#ededed', overflow: 'hidden' }}>
           {ledger.accounts.length ? ledger.accounts.map((account, index) => (
             <View key={account.id}>
               {index > 0 && <View style={{ height: 1, backgroundColor: '#f0f0f0', marginLeft: 83 }} />}
@@ -187,16 +189,14 @@ export default function AccountsAndCardsScreen() {
               />
             </View>
           )) : (
-            <Text style={{ fontFamily: regular, color: muted, fontSize: 13, padding: 18 }}>
-              Aún no hay cuentas.
-            </Text>
+            <EmptyState message='Agrega una cuenta para ver su saldo aquí.' compact />
           )}
         </View>
 
         <Text
           style={{
             fontFamily: medium,
-            color: muted,
+            color: ink,
             fontSize: 13,
             marginTop: 26,
             marginBottom: 10,
@@ -204,8 +204,9 @@ export default function AccountsAndCardsScreen() {
         >
           Tarjetas de crédito
         </Text>
-        <View style={{ backgroundColor: '#fff', borderRadius: 18,
-          borderWidth: 1, borderColor: '#ededed', overflow: 'hidden' }}>
+        <View style={{ backgroundColor: ledger.cards.length ? '#fff' : 'transparent',
+          borderRadius: 18, borderWidth: ledger.cards.length ? 1 : 0,
+          borderColor: '#ededed', overflow: 'hidden' }}>
           {ledger.cards.length ? ledger.cards.map((card, index) => (
             <View key={card.id}>
               {index > 0 && <View style={{ height: 1, backgroundColor: '#f0f0f0', marginLeft: 83 }} />}
@@ -222,9 +223,7 @@ export default function AccountsAndCardsScreen() {
               />
             </View>
           )) : (
-            <Text style={{ fontFamily: regular, color: muted, fontSize: 13, padding: 18 }}>
-              Aún no hay tarjetas.
-            </Text>
+            <EmptyState message='Agrega una tarjeta para consultar su deuda aquí.' compact />
           )}
         </View>
       </ScrollView>

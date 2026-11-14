@@ -1,6 +1,7 @@
 import * as Icon from '@/components/ui/PhosphorIcons'
 import { FinanceIcon } from '@/components/ui/FinanceIcon'
 import { Text, View } from 'react-native'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { getAccountDesign } from '@/features/finance/accountDesigns'
 import { getCardDesign } from '@/features/finance/cardDesigns'
 import { formatShortDateKey, localDateKey } from '@/features/finance/dates'
@@ -177,23 +178,23 @@ export function InstrumentDetailPreview({
       )}
       <View
         style={{
-          backgroundColor: '#fff',
-          borderRadius: 18,
-          paddingHorizontal: 16,
-          paddingVertical: account ? 4 : 0,
+          backgroundColor: activity.length ? '#fff' : 'transparent',
+          borderRadius: activity.length ? 18 : 0,
+          paddingHorizontal: activity.length ? 16 : 0,
+          paddingVertical: activity.length && account ? 4 : 0,
           marginTop: card ? 10 : 0,
         }}
       >
         <Text
           style={{
             fontFamily: 'Inter_500Medium',
-            color: '#888',
-            fontSize: 13,
+            color: '#101010',
+            fontSize: 16,
             marginTop: account ? 16 : 17,
             marginBottom: account ? 4 : 6,
           }}
         >
-          {account ? 'Movimientos recientes' : 'Actividad reciente'}
+          Historial
         </Text>
         {activity.length ? (
           activity.slice(0, 3).map((item) => (
@@ -258,16 +259,11 @@ export function InstrumentDetailPreview({
             </View>
           ))
         ) : (
-          <Text
-            style={{
-              fontFamily: 'Inter_400Regular',
-              fontSize: 13,
-              color: '#888',
-              paddingVertical: 20,
-            }}
-          >
-            Aún no hay movimientos.
-          </Text>
+          <EmptyState
+            message={account
+              ? 'Los ingresos y gastos de esta cuenta aparecerán aquí.'
+              : 'Las compras y pagos de esta tarjeta aparecerán aquí.'}
+          />
         )}
         {activity.length > 3 && (
           <Text

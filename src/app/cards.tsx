@@ -18,6 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { useSharedValue } from 'react-native-reanimated'
 import { AppBottomSheet } from '@/components/ui/AppBottomSheet'
 import { DateField } from '@/components/ui/DateField'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { InstrumentCardCarousel } from '@/components/finance/InstrumentCardCarousel'
 import { InstrumentDetailHeader } from '@/components/finance/InstrumentDetailHeader'
 import { InstrumentDetailMorph } from '@/components/finance/InstrumentDetailMorph'
@@ -182,7 +183,6 @@ export default function CardsScreen() {
   const cycles = ledger.cycles
     .filter((cycle) => cycle.cardId === selectedCardId)
     .sort((a, b) => b.cutoffDate.localeCompare(a.cutoffDate))
-  const paymentChoices = cycles
   const purchaseDate = mode === 'reassign'
     ? selectedActivity?.effectiveDate ?? todayKey
     : activityDate
@@ -190,6 +190,7 @@ export default function CardsScreen() {
     ...cycles.filter((cycle) => cycle.cutoffDate >= purchaseDate).reverse(),
     ...cycles.filter((cycle) => cycle.cutoffDate < purchaseDate),
   ]
+  const paymentChoices = cycles
     .filter((cycle) => statementAmountCents(ledger, cycle.id) > cycle.paidAmountCents)
     .sort((a, b) => comparePaymentCycles(a, b, todayKey))
   const visibleCards = ledger.cards.filter((card) => card.id === focusedCardId)
@@ -587,10 +588,11 @@ export default function CardsScreen() {
                   <Text style={{ fontFamily: medium, fontSize: 13, color: INK }}>+ Ciclo</Text>
                 </Pressable>
               )}
-              <View style={{ backgroundColor: '#fff', borderRadius: 18,
-                paddingHorizontal: 16, marginTop: 10 }}>
-                <Text style={{ fontFamily: medium, fontSize: 13, color: MUTED,
-                  paddingTop: 17, paddingBottom: 6 }}>Actividad reciente</Text>
+              <View style={{ backgroundColor: activity.length ? '#fff' : 'transparent',
+                borderRadius: activity.length ? 18 : 0,
+                paddingHorizontal: activity.length ? 16 : 0, marginTop: 10 }}>
+                <Text style={{ fontFamily: medium, fontSize: 16, color: INK,
+                  paddingTop: 17, paddingBottom: 6 }}>Historial</Text>
               {(showAllActivity ? activity : activity.slice(0, 3)).map((item) => (
                 <View
                   key={item.id}
@@ -658,8 +660,7 @@ export default function CardsScreen() {
                 </View>
               ))}
               {!activity.length && (
-                <Text style={{ fontFamily: regular, color: MUTED, fontSize: 13,
-                  paddingVertical: 20 }}>Aún no hay compras ni pagos.</Text>
+                <EmptyState message='Las compras y pagos de esta tarjeta aparecerán aquí.' />
               )}
               {activity.length > 3 && (
                 <Pressable onPress={() => setShowAllActivity((current) => !current)}
