@@ -660,7 +660,7 @@ export default function HomeTab() {
                   onRegisterMovement={() => router.push(
                     ledger.accounts.length
                       ? { pathname: '/movements', params: { create: '1' } }
-                      : '/accounts',
+                      : { pathname: '/accounts', params: { create: '1' } },
                   )}
                 />
             </View>

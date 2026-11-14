@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons'
 import { BottomSheetTextInput as TextInput } from '@gorhom/bottom-sheet'
 import { useFocusEffect } from '@react-navigation/native'
-import { useLocalSearchParams, useRouter } from 'expo-router'
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
 import { useCallback, useState } from 'react'
 import {
   Alert,
@@ -14,10 +14,14 @@ import {
   View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { useSharedValue } from 'react-native-reanimated'
 import { AppBottomSheet } from '@/components/ui/AppBottomSheet'
 import { DateField } from '@/components/ui/DateField'
+import { InstrumentCardCarousel } from '@/components/finance/InstrumentCardCarousel'
+import { InstrumentDetailHeader } from '@/components/finance/InstrumentDetailHeader'
+import { InstrumentDetailMorph } from '@/components/finance/InstrumentDetailMorph'
 import { cutoffForMonth, previousCutoffMonth } from '@/features/finance/billingCalendar'
-import { type CardDesignId, cardDesigns } from '@/features/finance/cardDesigns'
+import { type CardDesignId, cardDesigns, getCardDesign } from '@/features/finance/cardDesigns'
 import { addDaysKey, addMonthsKey, formatShortDateKey, isDateKey, localDateKey } from '@/features/finance/dates'
 import { allocateInstallments } from '@/features/finance/installments'
 import {
@@ -128,9 +132,10 @@ export default function CardsScreen() {
   const router = useRouter()
   const { width: screenWidth } = useWindowDimensions()
   const designPageWidth = screenWidth - 48
-  const { cardId: focusedCardId, create } = useLocalSearchParams<{
+  const { cardId: focusedCardId, create, swipe } = useLocalSearchParams<{
     cardId?: string
     create?: string
+    swipe?: string
   }>()
   const [ledger, setLedger] = useState(getLedger)
   useFocusEffect(
@@ -163,7 +168,10 @@ export default function CardsScreen() {
   const [scheduledDate, setScheduledDate] = useState('')
   const [useAutomaticPayment, setUseAutomaticPayment] = useState(false)
   const [showCyclePicker, setShowCyclePicker] = useState(false)
+  const [showAllActivity, setShowAllActivity] = useState(false)
   const [error, setError] = useState('')
+  const progress = useSharedValue(ledger.accounts.length + Math.max(0,
+    ledger.cards.findIndex((card) => card.id === focusedCardId)))
   const todayKey = localDateKey(new Date())
   const selectedCard = ledger.cards.find((card) => card.id === selectedCardId)
   const selectedCycle = ledger.cycles.find((cycle) => cycle.id === selectedCycleId)
@@ -173,13 +181,7 @@ export default function CardsScreen() {
   const paymentChoices = cycles
     .filter((cycle) => statementAmountCents(ledger, cycle.id) > cycle.paidAmountCents)
     .sort((a, b) => comparePaymentCycles(a, b, todayKey))
-  const visibleCards = focusedCardId
-    ? [
-        ...ledger.cards,
-      ].sort(
-        (left, right) => Number(right.id === focusedCardId) - Number(left.id === focusedCardId),
-      )
-    : ledger.cards
+  const visibleCards = ledger.cards.filter((card) => card.id === focusedCardId)
 
   function open(
     nextMode: FormMode,
@@ -315,6 +317,7 @@ export default function CardsScreen() {
                 },
           ),
         )
+        router.replace({ pathname: '/cards', params: { cardId: id } })
       } else if (mode === 'settings') {
         if (!selectedCard) throw new Error('Selecciona una tarjeta.')
         if (!selectedCard.billingRule && (!isDateKey(dueDate) || dueDate <= todayKey)) {
@@ -460,6 +463,7 @@ export default function CardsScreen() {
               setLedger(deleteCreditCard(cardId))
               setSelectedCardId('')
               setSelectedCycleId('')
+              router.replace('/accounts-and-cards')
             } catch (caught) {
               Alert.alert(
                 'No se puede eliminar',
@@ -473,102 +477,49 @@ export default function CardsScreen() {
   }
 
   return (
+    <>
+    <Stack.Screen options={{ animation: swipe === '1' ? 'none' : 'default' }} />
     <SafeAreaView
       style={{
         flex: 1,
         backgroundColor: BACKGROUND,
       }}
     >
+      <View style={{ height: 70, paddingHorizontal: 24, justifyContent: 'center' }}>
+        <Pressable
+          onPress={() => focusedCardId || create === '1'
+            ? router.back() : router.replace('/accounts-and-cards')}
+          accessibilityRole='button'
+          accessibilityLabel='Cerrar detalle'
+          style={{ alignSelf: 'flex-start', padding: 3 }}
+        >
+          <Feather name='x' size={23} color={INK} />
+        </Pressable>
+      </View>
       <ScrollView
+        style={{ flex: 1, backgroundColor: BACKGROUND }}
+        nestedScrollEnabled
         contentContainerStyle={{
           paddingHorizontal: 24,
           paddingBottom: 42,
         }}
       >
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            marginTop: 18,
-          }}
-        >
-          <Pressable
-            onPress={() => router.back()}
-            hitSlop={12}
-            accessibilityRole='button'
-            accessibilityLabel='Volver'
-          >
-            <Feather name='arrow-left' size={23} color={INK} />
-          </Pressable>
-          <Text
-            style={{
-              flex: 1,
-              textAlign: 'center',
-              marginRight: 23,
-              fontFamily: medium,
-              fontSize: 16,
-              color: INK,
-            }}
-          >
-            Tarjetas
-          </Text>
-        </View>
-        <Text
-          style={{
-            marginTop: 58,
-            fontFamily: semibold,
-            fontSize: 31,
-            letterSpacing: -1,
-            color: INK,
-          }}
-        >
-          Tarjetas de crédito
-        </Text>
-        <Text
-          style={{
-            marginTop: 10,
-            fontFamily: regular,
-            fontSize: 14,
-            lineHeight: 21,
-            color: MUTED,
-          }}
-        >
-          Las compras aumentan la deuda. La liquidez cambia al registrar o programar un pago.
-        </Text>
-        <Text
-          style={{
-            marginTop: 6,
-            fontFamily: regular,
-            fontSize: 12,
-            lineHeight: 18,
-            color: MUTED,
-          }}
-        >
-          Registra solo compras nuevas que no estén incluidas en la deuda inicial.
-        </Text>
-        <Pressable
-          onPress={() => (ledger.accounts.length ? open('card') : router.push('/accounts'))}
-          style={{
-            marginTop: 24,
-            height: 52,
-            backgroundColor: INK,
-            borderRadius: 12,
-            justifyContent: 'center',
-            alignItems: 'center',
-            flexDirection: 'row',
-            gap: 8,
-          }}
-        >
-          <Feather name='plus' size={18} color='#fff' />
-          <Text
-            style={{
-              fontFamily: medium,
-              color: '#fff',
-            }}
-          >
-            {ledger.accounts.length ? 'Añadir tarjeta' : 'Añadir cuenta bancaria primero'}
-          </Text>
-        </Pressable>
+        {!visibleCards.length && (
+          <View>
+            <Text style={{ fontFamily: semibold, fontSize: 28, color: INK,
+              marginTop: 12 }}>{create === '1' ? 'Nueva tarjeta' : 'Tarjeta no disponible'}</Text>
+            <Text style={{ fontFamily: regular, color: MUTED,
+              marginTop: 12 }}>{create === '1' ? 'Completa los datos para añadirla a tu cartera.' :
+                'Vuelve a Cuentas y tarjetas para elegir otra tarjeta.'}</Text>
+          </View>
+        )}
+        {!!focusedCardId && (
+          <InstrumentCardCarousel ledger={ledger} instrumentId={focusedCardId} kind='card'
+            progress={progress} />
+        )}
+        {!!visibleCards.length && focusedCardId && (
+          <InstrumentDetailMorph ledger={ledger} instrumentId={focusedCardId}
+            kind='card' progress={progress}>
         {visibleCards.map((card) => {
           const cardCycles = ledger.cycles
             .filter((cycle) => cycle.cardId === card.id)
@@ -588,159 +539,50 @@ export default function CardsScreen() {
             .filter((item) => item.cardId === card.id)
             .sort((a, b) => b.effectiveDate.localeCompare(a.effectiveDate))
           return (
-            <View
-              key={card.id}
-              style={{
-                marginTop: 24,
-                borderWidth: card.id === focusedCardId ? 1.5 : 0,
-                borderColor: INK,
-                borderRadius: 12,
-              }}
-            >
-              <View
-                style={{
-                  padding: 18,
-                  backgroundColor: '#fff',
-                  borderRadius: 12,
-                }}
-              >
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                  }}
-                >
-                  <Text
-                    style={{
-                      flex: 1,
-                      fontFamily: semibold,
-                      fontSize: 17,
-                      color: INK,
-                    }}
-                  >
-                    {card.name}
-                  </Text>
-                  <Pressable
-                    onPress={() => confirmDeleteCard(card.id, card.name)}
-                    hitSlop={10}
-                    accessibilityRole='button'
-                    accessibilityLabel={`Eliminar tarjeta ${card.name}`}
-                  >
-                    <Feather name='trash-2' size={18} color='#c84242' />
-                  </Pressable>
-                </View>
-                <Text
-                  style={{
-                    fontFamily: regular,
-                    fontSize: 13,
-                    color: MUTED,
-                    marginTop: 5,
-                  }}
-                >
-                  Deuda actual · Corte día {card.cutoffDay}
-                </Text>
-                <Text
-                  style={{
-                    fontFamily: semibold,
-                    fontSize: 24,
-                    color: INK,
-                    marginTop: 12,
-                  }}
-                >
-                  {formatMoney(card.currentDebtCents)}
-                </Text>
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    gap: 14,
-                    marginTop: 18,
-                  }}
-                >
-                  <Pressable onPress={() => open('settings', card.id)}>
-                    <Text
-                      style={{
-                        fontFamily: medium,
-                        color: INK,
-                        fontSize: 13,
-                      }}
-                    >
-                      Editar
-                    </Text>
-                  </Pressable>
-                  {!card.billingRule && (
-                    <Pressable onPress={() => open('cycle', card.id)}>
-                      <Text style={{ fontFamily: medium, color: INK, fontSize: 13 }}>
-                        + Ciclo
-                      </Text>
-                    </Pressable>
-                  )}
-                  <Pressable
-                    onPress={() => purchaseCycle && open('purchase', card.id, purchaseCycle.id)}
-                  >
-                    <Text
-                      style={{
-                        fontFamily: medium,
-                        color: purchaseCycle ? INK : MUTED,
-                        fontSize: 13,
-                      }}
-                    >
-                      + Compra
-                    </Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => paymentCycle && open('payment', card.id, paymentCycle.id)}
-                  >
-                    <Text
-                      style={{
-                        fontFamily: medium,
-                        color: paymentCycle ? INK : MUTED,
-                        fontSize: 13,
-                      }}
-                    >
-                      + Pago
-                    </Text>
-                  </Pressable>
-                </View>
-              </View>
-              {nextCycle && (
-                <Pressable
-                  onPress={() => open('plan', card.id, nextCycle.id)}
-                  accessibilityRole='button'
-                  accessibilityLabel={`Editar ciclo de corte ${formatShortDateKey(nextCycle.cutoffDate)}`}
-                  style={{ marginTop: 8, padding: 16, backgroundColor: '#fff',
-                    borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 12 }}
-                >
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontFamily: medium, color: MUTED, fontSize: 12 }}>
-                      {nextCycle.cutoffDate < todayKey ? 'Próximo pago' : 'Siguiente corte'}
-                    </Text>
-                    <Text style={{ fontFamily: semibold, color: INK, fontSize: 22, marginTop: 4 }}>
-                      {formatMoney(Math.max(0,
-                        (nextCycle.paymentMode === 'automatic'
-                          ? statementAmountCents(ledger, nextCycle.id)
-                          : nextCycle.scheduledAmountCents) - nextCycle.paidAmountCents))}
-                    </Text>
-                    <Text style={{ fontFamily: regular, color: MUTED, fontSize: 12, marginTop: 4 }}>
-                      Corte {formatShortDateKey(nextCycle.cutoffDate)} · Pago {formatShortDateKey(nextCycle.paymentMode === 'automatic'
-                        ? nextCycle.dueDate : nextCycle.scheduledDate ?? nextCycle.dueDate)}
-                      {nextCycle.automatic && !nextCycle.dueDateConfirmed ? ' estimado' : ''}
-                    </Text>
-                  </View>
-                  <Feather name='edit-2' size={17} color={MUTED} />
+            <View key={card.id}>
+              <InstrumentDetailHeader
+                name={card.name}
+                bank={getCardDesign(card.cardDesignId)?.bank ?? 'Banco no especificado'}
+                amountCents={card.currentDebtCents}
+                isCreditCard
+                image={getCardDesign(card.cardDesignId)?.image}
+                showImage={false}
+                actions={[
+                  { label: 'Compra', icon: 'shopping-bag',
+                    disabled: !purchaseCycle,
+                    onPress: () => purchaseCycle && open('purchase', card.id, purchaseCycle.id) },
+                  { label: 'Pago', icon: 'dollar-sign',
+                    disabled: !paymentCycle,
+                    onPress: () => paymentCycle && open('payment', card.id, paymentCycle.id) },
+                  { label: 'Ajustes', icon: 'settings',
+                    onPress: () => open('settings', card.id) },
+                ]}
+              />
+              {!card.billingRule && (
+                <Pressable onPress={() => open('cycle', card.id)}
+                  style={{ alignSelf: 'flex-end', paddingVertical: 8 }}>
+                  <Text style={{ fontFamily: medium, fontSize: 13, color: INK }}>+ Ciclo</Text>
                 </Pressable>
               )}
-              {activity.map((item) => (
+              <View style={{ backgroundColor: '#fff', borderRadius: 18,
+                paddingHorizontal: 16, marginTop: 10 }}>
+                <Text style={{ fontFamily: medium, fontSize: 13, color: MUTED,
+                  paddingTop: 17, paddingBottom: 6 }}>Actividad reciente</Text>
+              {(showAllActivity ? activity : activity.slice(0, 3)).map((item) => (
                 <View
                   key={item.id}
                   style={{
-                    marginTop: 8,
-                    padding: 16,
-                    backgroundColor: '#fff',
-                    borderRadius: 12,
+                    paddingVertical: 14,
                     flexDirection: 'row',
                     alignItems: 'center',
+                    gap: 10,
                   }}
                 >
+                  <View style={{ width: 38, height: 38, borderRadius: 19,
+                    backgroundColor: '#f0f0f0', alignItems: 'center', justifyContent: 'center' }}>
+                    <Feather name={item.type === 'purchase' ? 'shopping-bag' : 'arrow-down-left'}
+                      size={17} color={INK} />
+                  </View>
                   <Pressable
                     onPress={() =>
                       item.type === 'purchase' && open('reassign', card.id, item.cycleId, item)
@@ -779,10 +621,9 @@ export default function CardsScreen() {
                       fontFamily: medium,
                       color: INK,
                       fontSize: 13,
-                      marginRight: 12,
                     }}
                   >
-                    {formatMoney(item.amountCents)}
+                    {item.type === 'purchase' ? '−' : '+'}{formatMoney(item.amountCents)}
                   </Text>
                   <Pressable
                     onPress={() => removeActivity(item)}
@@ -793,9 +634,51 @@ export default function CardsScreen() {
                   </Pressable>
                 </View>
               ))}
+              {!activity.length && (
+                <Text style={{ fontFamily: regular, color: MUTED, fontSize: 13,
+                  paddingVertical: 20 }}>Aún no hay compras ni pagos.</Text>
+              )}
+              {activity.length > 3 && (
+                <Pressable onPress={() => setShowAllActivity((current) => !current)}
+                  style={{ alignItems: 'center', paddingVertical: 16 }}>
+                  <Text style={{ fontFamily: medium, fontSize: 13, color: INK }}>
+                    {showAllActivity ? 'Mostrar menos' : 'Ver todos'}
+                  </Text>
+                </Pressable>
+              )}
+              </View>
+              {nextCycle && (
+                <Pressable
+                  onPress={() => open('plan', card.id, nextCycle.id)}
+                  accessibilityRole='button'
+                  accessibilityLabel={`Editar ciclo de corte ${formatShortDateKey(nextCycle.cutoffDate)}`}
+                  style={{ marginTop: 10, padding: 16, backgroundColor: '#fff',
+                    borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 12 }}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontFamily: medium, color: MUTED, fontSize: 12 }}>
+                      {nextCycle.cutoffDate < todayKey ? 'Próximo pago' : 'Siguiente corte'}
+                    </Text>
+                    <Text style={{ fontFamily: semibold, color: INK, fontSize: 22, marginTop: 4 }}>
+                      {formatMoney(Math.max(0,
+                        (nextCycle.paymentMode === 'automatic'
+                          ? statementAmountCents(ledger, nextCycle.id)
+                          : nextCycle.scheduledAmountCents) - nextCycle.paidAmountCents))}
+                    </Text>
+                    <Text style={{ fontFamily: regular, color: MUTED, fontSize: 12, marginTop: 4 }}>
+                      Corte {formatShortDateKey(nextCycle.cutoffDate)} · Pago {formatShortDateKey(nextCycle.paymentMode === 'automatic'
+                        ? nextCycle.dueDate : nextCycle.scheduledDate ?? nextCycle.dueDate)}
+                      {nextCycle.automatic && !nextCycle.dueDateConfirmed ? ' estimado' : ''}
+                    </Text>
+                  </View>
+                  <Feather name='edit-2' size={17} color={MUTED} />
+                </Pressable>
+              )}
             </View>
           )
         })}
+          </InstrumentDetailMorph>
+        )}
       </ScrollView>
       <AppBottomSheet
         visible={mode !== null}
@@ -1310,8 +1193,18 @@ export default function CardsScreen() {
               </Text>
             </Pressable>
           </View>
+          {mode === 'settings' && selectedCard && (
+            <Pressable onPress={() => confirmDeleteCard(selectedCard.id, selectedCard.name)}
+              accessibilityRole='button' accessibilityLabel='Eliminar tarjeta'
+              style={{ alignItems: 'center', paddingVertical: 18, marginTop: 6 }}>
+              <Text style={{ fontFamily: medium, color: '#c84242', fontSize: 13 }}>
+                Eliminar tarjeta
+              </Text>
+            </Pressable>
+          )}
         </View>
       </AppBottomSheet>
     </SafeAreaView>
+    </>
   )
 }

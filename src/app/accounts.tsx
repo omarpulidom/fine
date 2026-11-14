@@ -1,7 +1,8 @@
 import { Feather } from '@expo/vector-icons'
 import { BottomSheetTextInput as TextInput } from '@gorhom/bottom-sheet'
-import { useLocalSearchParams, useRouter } from 'expo-router'
-import { useState } from 'react'
+import { useFocusEffect } from '@react-navigation/native'
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
+import { useCallback, useState } from 'react'
 import {
   Alert,
   Image,
@@ -13,13 +14,17 @@ import {
   View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { useSharedValue } from 'react-native-reanimated'
 import { AppBottomSheet } from '@/components/ui/AppBottomSheet'
+import { InstrumentCardCarousel } from '@/components/finance/InstrumentCardCarousel'
+import { InstrumentDetailHeader } from '@/components/finance/InstrumentDetailHeader'
+import { InstrumentDetailMorph } from '@/components/finance/InstrumentDetailMorph'
 import {
   type AccountDesignId,
   accountDesigns,
   getAccountDesign,
 } from '@/features/finance/accountDesigns'
-import { localDateKey } from '@/features/finance/dates'
+import { formatShortDateKey, localDateKey } from '@/features/finance/dates'
 import {
   deleteAccount,
   getLedger,
@@ -40,11 +45,13 @@ export default function AccountsScreen() {
   const router = useRouter()
   const { width: screenWidth } = useWindowDimensions()
   const designPageWidth = screenWidth - 48
-  const { accountId, create } = useLocalSearchParams<{
+  const { accountId, create, swipe } = useLocalSearchParams<{
     accountId?: string
     create?: string
+    swipe?: string
   }>()
   const [ledger, setLedger] = useState(getLedger)
+  useFocusEffect(useCallback(() => setLedger(getLedger()), []))
   const [editing, setEditing] = useState<LiquidAccount | null | undefined>(
     create === '1' ? null : undefined,
   )
@@ -53,11 +60,14 @@ export default function AccountsScreen() {
   const [name, setName] = useState('')
   const [balance, setBalance] = useState('')
   const [error, setError] = useState('')
-  const visibleAccounts = accountId
-    ? [
-        ...ledger.accounts,
-      ].sort((left, right) => Number(right.id === accountId) - Number(left.id === accountId))
-    : ledger.accounts
+  const [showAllHistory, setShowAllHistory] = useState(false)
+  const progress = useSharedValue(Math.max(0,
+    ledger.accounts.findIndex((account) => account.id === accountId)))
+  const selectedAccount = ledger.accounts.find((account) => account.id === accountId)
+  const history = ledger.completedMovements
+    .filter((movement) => movement.accountId === accountId ||
+      movement.counterpartyAccountId === accountId)
+    .sort((left, right) => right.effectiveDate.localeCompare(left.effectiveDate))
 
   function open(account: LiquidAccount | null) {
     setEditing(account)
@@ -92,9 +102,10 @@ export default function AccountsScreen() {
       return
     }
     try {
+      const savedId = editing?.id ?? newAccountId()
       setLedger(
         upsertAccount({
-          id: editing?.id ?? newAccountId(),
+          id: savedId,
           name: name.trim(),
           type: selectedDesignId === 'cash' ? 'cash' : 'bank',
           accountDesignId: selectedDesignId,
@@ -103,6 +114,7 @@ export default function AccountsScreen() {
         }),
       )
       setEditing(undefined)
+      if (!editing) router.replace({ pathname: '/accounts', params: { accountId: savedId } })
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'No se pudo guardar la cuenta.')
     }
@@ -124,6 +136,7 @@ export default function AccountsScreen() {
             try {
               setLedger(deleteAccount(account.id))
               setEditing(undefined)
+              router.replace('/accounts-and-cards')
             } catch (caught) {
               Alert.alert(
                 'No se puede eliminar',
@@ -137,147 +150,106 @@ export default function AccountsScreen() {
   }
 
   return (
+    <>
+    <Stack.Screen options={{ animation: swipe === '1' ? 'none' : 'default' }} />
     <SafeAreaView
       style={{
         flex: 1,
         backgroundColor: BACKGROUND,
       }}
     >
+      <View style={{ height: 70, paddingHorizontal: 24, justifyContent: 'center' }}>
+        <Pressable
+          onPress={() => accountId || create === '1'
+            ? router.back() : router.replace('/accounts-and-cards')}
+          accessibilityRole='button'
+          accessibilityLabel='Cerrar detalle'
+          style={{ alignSelf: 'flex-start', padding: 3 }}
+        >
+          <Feather name='x' size={23} color={INK} />
+        </Pressable>
+      </View>
       <ScrollView
+        style={{ flex: 1, backgroundColor: BACKGROUND }}
+        nestedScrollEnabled
         contentContainerStyle={{
           paddingHorizontal: 24,
           paddingBottom: 40,
         }}
       >
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            marginTop: 18,
-          }}
-        >
-          <Pressable
-            onPress={() => router.back()}
-            hitSlop={12}
-            accessibilityRole='button'
-            accessibilityLabel='Volver'
-          >
-            <Feather name='arrow-left' size={23} color={INK} />
-          </Pressable>
-          <Text
-            style={{
-              flex: 1,
-              textAlign: 'center',
-              marginRight: 23,
-              fontFamily: medium,
-              fontSize: 16,
-              color: INK,
-            }}
-          >
-            Cuentas
-          </Text>
-        </View>
-        <Text
-          style={{
-            marginTop: 60,
-            fontFamily: semibold,
-            fontSize: 31,
-            color: INK,
-            letterSpacing: -1,
-          }}
-        >
-          Tu dinero disponible
-        </Text>
-        <Text
-          style={{
-            marginTop: 10,
-            fontFamily: regular,
-            fontSize: 14,
-            lineHeight: 21,
-            color: MUTED,
-          }}
-        >
-          Saldos actuales en efectivo y cuentas bancarias. Ajusta un saldo cuando lo reconcilies con
-          tu banco.
-        </Text>
-        {visibleAccounts.map((account) => (
-          <Pressable
-            key={account.id}
-            onPress={() => open(account)}
-            style={{
-              marginTop: 14,
-              padding: 18,
-              backgroundColor: '#fff',
-              borderRadius: 12,
-              borderWidth: account.id === accountId ? 1.5 : 0,
-              borderColor: INK,
-              flexDirection: 'row',
-              alignItems: 'center',
-            }}
-          >
-            <View
-              style={{
-                flex: 1,
-              }}
-            >
-              <Text
-                style={{
-                  fontFamily: medium,
-                  fontSize: 16,
-                  color: INK,
-                }}
-              >
-                {account.name}
-              </Text>
-              <Text
-                style={{
-                  fontFamily: regular,
-                  fontSize: 12,
-                  color: MUTED,
-                  marginTop: 4,
-                }}
-              >
-                {account.type === 'cash'
-                  ? 'Efectivo'
-                  : (getAccountDesign(account.accountDesignId)?.label ?? 'Banco / débito')}
-              </Text>
+        {!!accountId && (
+          <InstrumentCardCarousel ledger={ledger} instrumentId={accountId} kind='account'
+            progress={progress} />
+        )}
+        {selectedAccount ? (
+          <InstrumentDetailMorph ledger={ledger} instrumentId={selectedAccount.id}
+            kind='account' progress={progress}>
+            <View>
+            <InstrumentDetailHeader
+              name={selectedAccount.name}
+              bank={selectedAccount.type === 'cash' ? 'Efectivo' :
+                (getAccountDesign(selectedAccount.accountDesignId)?.label ?? 'Banco no especificado')}
+              amountCents={selectedAccount.balanceCents}
+              isCreditCard={false}
+              image={getAccountDesign(selectedAccount.accountDesignId)?.image}
+              showImage={false}
+              actions={[
+                { label: 'Movimientos', icon: 'list', onPress: () => router.push('/movements') },
+                { label: 'Editar', icon: 'edit-2', onPress: () => open(selectedAccount) },
+                { label: 'Eliminar', icon: 'trash-2',
+                  onPress: () => confirmDeleteAccount(selectedAccount) },
+              ]}
+            />
+            <View style={{ backgroundColor: '#fff', borderRadius: 18,
+              paddingHorizontal: 16, paddingVertical: 4 }}>
+              <Text style={{ fontFamily: medium, color: MUTED, fontSize: 13,
+                marginTop: 16, marginBottom: 4 }}>Movimientos recientes</Text>
+              {history.length ? (showAllHistory ? history : history.slice(0, 3)).map((movement) => (
+                <View key={movement.id} style={{ flexDirection: 'row', alignItems: 'center',
+                  minHeight: 68, gap: 12 }}>
+                  <View style={{ width: 38, height: 38, borderRadius: 19,
+                    backgroundColor: '#f0f0f0', alignItems: 'center', justifyContent: 'center' }}>
+                    <Feather name={movement.type === 'income' ? 'arrow-down-left' :
+                      movement.type === 'expense' ? 'arrow-up-right' : 'repeat'}
+                      size={18} color={INK} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text numberOfLines={1} style={{ fontFamily: medium, fontSize: 14,
+                      color: INK }}>{movement.description ||
+                        (movement.type === 'income' ? 'Ingreso' :
+                          movement.type === 'expense' ? 'Gasto' : 'Transferencia')}</Text>
+                    <Text style={{ fontFamily: regular, fontSize: 12, color: MUTED,
+                      marginTop: 3 }}>{formatShortDateKey(movement.effectiveDate)}</Text>
+                  </View>
+                  <Text style={{ fontFamily: medium, fontSize: 13, color: INK }}>
+                    {movement.type === 'income' ? '+' : movement.type === 'expense' ? '−' : '↔'}
+                    {formatMoney(movement.amountCents)}
+                  </Text>
+                </View>
+              )) : (
+                <Text style={{ fontFamily: regular, fontSize: 13, color: MUTED,
+                  paddingVertical: 20 }}>Aún no hay movimientos.</Text>
+              )}
+              {history.length > 3 && (
+                <Pressable onPress={() => setShowAllHistory((current) => !current)}
+                  style={{ alignItems: 'center', paddingVertical: 16 }}>
+                  <Text style={{ fontFamily: medium, fontSize: 13, color: INK }}>
+                    {showAllHistory ? 'Mostrar menos' : 'Ver todos'}
+                  </Text>
+                </Pressable>
+              )}
             </View>
-            <Text
-              style={{
-                fontFamily: medium,
-                color: INK,
-                fontSize: 15,
-                marginRight: 10,
-              }}
-            >
-              {formatMoney(account.balanceCents)}
-            </Text>
-            <Feather name='chevron-right' size={17} color={MUTED} />
-          </Pressable>
-        ))}
-        <Pressable
-          onPress={() => open(null)}
-          style={{
-            marginTop: 18,
-            height: 52,
-            backgroundColor: INK,
-            borderRadius: 12,
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexDirection: 'row',
-            gap: 8,
-          }}
-        >
-          <Feather name='plus' size={18} color='#fff' />
-          <Text
-            style={{
-              color: '#fff',
-              fontFamily: medium,
-            }}
-          >
-            Añadir cuenta
-          </Text>
-        </Pressable>
+            </View>
+          </InstrumentDetailMorph>
+        ) : (
+          <View>
+            <Text style={{ fontFamily: semibold, fontSize: 28, color: INK,
+              marginTop: 12 }}>{create === '1' ? 'Nueva cuenta' : 'Cuenta no disponible'}</Text>
+            <Text style={{ fontFamily: regular, color: MUTED,
+              marginTop: 12 }}>{create === '1' ? 'Completa los datos para añadirla a tu cartera.' :
+                'Vuelve a Cuentas y tarjetas para elegir otra cuenta.'}</Text>
+          </View>
+        )}
       </ScrollView>
       <AppBottomSheet visible={editing !== undefined} onClose={() => setEditing(undefined)}>
         <View>
@@ -557,5 +529,6 @@ export default function AccountsScreen() {
         </View>
       </AppBottomSheet>
     </SafeAreaView>
+    </>
   )
 }
