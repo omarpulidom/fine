@@ -34,9 +34,7 @@ type Props = {
 const ink = '#101010'
 const muted = '#898989'
 const regular = 'Inter_400Regular'
-const light = 'Inter_300Light'
 const medium = 'Inter_500Medium'
-const semibold = 'Inter_600SemiBold'
 
 function displayDate(date: string) {
   return formatDateDisplay(new Date(`${date}T12:00:00`))
@@ -228,18 +226,26 @@ export function ScheduledMovementsList({
                 accessibilityRole='button'
                 accessibilityLabel={`${title}, ${formatShortDateKey(item.date)}, ${formatMoney(amount)}`}
                 style={{
-                  width: 166,
-                  height: 148,
-                  borderRadius: 14,
+                  width: 188,
+                  height: 150,
+                  borderRadius: 18,
                   backgroundColor: '#fff',
-                  padding: 14,
+                  borderWidth: 1,
+                  borderColor: '#ebebeb',
+                  paddingHorizontal: 15,
+                  paddingVertical: 12,
                   justifyContent: 'space-between',
                 }}
               >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <View style={{ width: 30, height: 30, borderRadius: 15,
+                    backgroundColor: '#f1f1f1', alignItems: 'center', justifyContent: 'center' }}>
+                    <Feather name={cycle ? 'credit-card' : type === 'income' ? 'arrow-down-left'
+                      : type === 'transfer' ? 'repeat' : 'arrow-up-right'} size={15} color={ink} />
+                  </View>
                   <Text numberOfLines={1}
-                    style={{ flex: 1, color: muted, fontFamily: light, fontSize: 11 }}>
-                    {formatShortDateKey(item.date)}
+                    style={{ flex: 1, color: muted, fontFamily: medium, fontSize: 11 }}>
+                    {movement ? recurrenceLabel(movement) ?? 'Único' : 'Tarjeta'}
                   </Text>
                   {movement && (
                     <Pressable
@@ -250,30 +256,30 @@ export function ScheduledMovementsList({
                       accessibilityRole='button'
                       accessibilityLabel={`Eliminar ${title} del ${formatShortDateKey(item.date)}`}
                       hitSlop={8}
-                      style={{ width: 23, height: 23, alignItems: 'center', justifyContent: 'center' }}
+                      style={{ width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }}
                     >
-                      <Feather name='x' size={17} color={muted} />
+                      <Feather name='x' size={16} color={muted} />
                     </Pressable>
                   )}
                 </View>
                 <Text numberOfLines={2}
-                  style={{ color: ink, fontFamily: medium, fontSize: 14, lineHeight: 19 }}>
+                  style={{ color: ink, fontFamily: medium, fontSize: 15, lineHeight: 20 }}>
                   {title}
                 </Text>
-                <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 3 }}>
-                  <Text style={{ color: muted, fontFamily: light, fontSize: 19 }}>
-                    {type === 'income' ? '+' : type === 'transfer' ? '↔' : '−'}
+                <View>
+                  <Text numberOfLines={1}
+                    style={{ color: muted, fontFamily: regular, fontSize: 11, marginBottom: 3 }}>
+                    {formatShortDateKey(item.date)}
                   </Text>
-                  <Text numberOfLines={1} adjustsFontSizeToFit
-                    style={{ flex: 1, color: ink, fontFamily: semibold, fontSize: 18 }}>
-                    {formatMoney(amount)}
-                  </Text>
-                </View>
-                <View style={{ alignSelf: 'flex-start', borderRadius: 999,
-                  backgroundColor: '#f2f2f2', paddingHorizontal: 8, paddingVertical: 4 }}>
-                  <Text style={{ color: muted, fontFamily: regular, fontSize: 10 }}>
-                    {movement ? recurrenceLabel(movement) ?? 'Único' : 'Tarjeta'}
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+                    <Text style={{ color: muted, fontFamily: regular, fontSize: 21 }}>
+                      {type === 'income' ? '+' : type === 'transfer' ? '↔' : '−'}
+                    </Text>
+                    <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}
+                      style={{ flex: 1, color: ink, fontFamily: medium, fontSize: 21 }}>
+                      {formatMoney(amount)}
+                    </Text>
+                  </View>
                 </View>
               </Pressable>
             )
@@ -283,18 +289,29 @@ export function ScheduledMovementsList({
             accessibilityRole='button'
             accessibilityLabel='Ver todos los movimientos programados'
             style={{
-              width: 118,
-              height: 148,
-              borderRadius: 14,
-              backgroundColor: '#eaeaea',
-              padding: 14,
+              width: 138,
+              height: 150,
+              borderRadius: 18,
+              backgroundColor: '#fff',
+              borderWidth: 1,
+              borderColor: '#ebebeb',
+              paddingHorizontal: 15,
+              paddingVertical: 12,
               justifyContent: 'space-between',
             }}
           >
-            <Feather name='arrow-right' size={18} color={ink} />
-            <Text style={{ color: ink, fontFamily: medium, fontSize: 13 }}>
-              Ver todos{visibleItems.length > 4 ? `\n+${visibleItems.length - 4} más` : ''}
-            </Text>
+            <View style={{ width: 30, height: 30, borderRadius: 15,
+              backgroundColor: '#f1f1f1', alignItems: 'center', justifyContent: 'center' }}>
+              <Feather name='arrow-right' size={16} color={ink} />
+            </View>
+            <View>
+              <Text style={{ color: ink, fontFamily: medium, fontSize: 15 }}>Ver todos</Text>
+              {visibleItems.length > 4 && (
+                <Text style={{ color: muted, fontFamily: regular, fontSize: 11, marginTop: 4 }}>
+                  +{visibleItems.length - 4} más
+                </Text>
+              )}
+            </View>
           </Pressable>
         </ScrollView>
       ) : (
