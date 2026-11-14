@@ -75,6 +75,7 @@ export default function HomeTab() {
     useCallback(() => {
       setToday(new Date());
       setLedger(getLedger());
+      setMovements(getScheduledMovements());
       setSkippedOccurrences(getSkippedOccurrences());
       setSelectedDay(0);
     }, []),
@@ -704,6 +705,7 @@ export default function HomeTab() {
             onComplete={confirmCompleteMovement}
             onDelete={confirmDeleteMovement}
             onOpenCard={(cardId) => router.push({ pathname: "/cards", params: { cardId } })}
+            onViewAll={() => router.push("/scheduled-movements")}
           />
           <Pressable
             onPress={() => {

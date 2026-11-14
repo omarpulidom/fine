@@ -29,6 +29,8 @@ type Props = {
   onComplete: (movement: ScheduledMovement) => void
   onDelete: (movement: ScheduledMovement, occurrenceDate: string) => void
   onOpenCard: (cardId: string) => void
+  mode?: 'carousel' | 'full'
+  onViewAll?: () => void
 }
 
 const ink = '#101010'
@@ -56,9 +58,10 @@ export function ScheduledMovementsList({
   onComplete,
   onDelete,
   onOpenCard,
+  mode = 'carousel',
+  onViewAll,
 }: Props) {
   const [filter, setFilter] = useState<Filter>('all')
-  const [expanded, setExpanded] = useState(false)
   const items = useMemo<ListItem[]>(() => {
     const movementItems: ListItem[] = movements.flatMap((movement) => {
       const date = nextOccurrenceDate(movement, completedOccurrences)
@@ -136,16 +139,11 @@ export function ScheduledMovementsList({
 
   return (
     <View>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+      {mode === 'carousel' && (
         <Text style={{ color: muted, fontFamily: regular, fontSize: 14 }}>
           Movimientos programados
         </Text>
-        {expanded && (
-          <Pressable onPress={() => setExpanded(false)} accessibilityRole='button'>
-            <Text style={{ color: ink, fontFamily: medium, fontSize: 12 }}>Mostrar menos</Text>
-          </Pressable>
-        )}
-      </View>
+      )}
       <View
         style={{
           flexDirection: 'row',
@@ -208,7 +206,7 @@ export function ScheduledMovementsList({
                 : 'Aún no hay movimientos programados'}
           </Text>
         </View>
-      ) : !expanded ? (
+      ) : mode === 'carousel' ? (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -285,7 +283,7 @@ export function ScheduledMovementsList({
             )
           })}
           <Pressable
-            onPress={() => setExpanded(true)}
+            onPress={onViewAll}
             accessibilityRole='button'
             accessibilityLabel='Ver todos los movimientos programados'
             style={{
