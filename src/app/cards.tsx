@@ -183,6 +183,13 @@ export default function CardsScreen() {
     .filter((cycle) => cycle.cardId === selectedCardId)
     .sort((a, b) => b.cutoffDate.localeCompare(a.cutoffDate))
   const paymentChoices = cycles
+  const purchaseDate = mode === 'reassign'
+    ? selectedActivity?.effectiveDate ?? todayKey
+    : activityDate
+  const purchaseChoices = [
+    ...cycles.filter((cycle) => cycle.cutoffDate >= purchaseDate).reverse(),
+    ...cycles.filter((cycle) => cycle.cutoffDate < purchaseDate),
+  ]
     .filter((cycle) => statementAmountCents(ledger, cycle.id) > cycle.paidAmountCents)
     .sort((a, b) => comparePaymentCycles(a, b, todayKey))
   const visibleCards = ledger.cards.filter((card) => card.id === focusedCardId)
@@ -961,7 +968,7 @@ export default function CardsScreen() {
                   marginTop: 10,
                 }}
               >
-                {(mode === 'payment' ? paymentChoices : cycles).map((cycle) => (
+                {(mode === 'payment' ? paymentChoices : purchaseChoices).map((cycle) => (
                   <Pressable
                     key={cycle.id}
                     onPress={() => setSelectedCycleId(cycle.id)}
