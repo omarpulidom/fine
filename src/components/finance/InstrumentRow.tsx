@@ -1,4 +1,5 @@
-import { Feather } from '@expo/vector-icons'
+import * as Icon from '@/components/ui/PhosphorIcons'
+import { FinanceIcon } from '@/components/ui/FinanceIcon'
 import { Pressable, Text, View } from 'react-native'
 
 const ink = '#101010'
@@ -34,7 +35,7 @@ export function InstrumentRow({ label, detail, icon, onPress, disabled = false }
         opacity: disabled ? 0.45 : 1,
       }}
     >
-      <Feather
+      <FinanceIcon
         name={icon}
         size={19}
         color={ink}
@@ -67,7 +68,7 @@ export function InstrumentRow({ label, detail, icon, onPress, disabled = false }
           {detail}
         </Text>
       </View>
-      <Feather name='arrow-right' size={17} color={muted} />
+      <Icon.ArrowRightIcon size={17} color={muted} />
     </Pressable>
   )
 }

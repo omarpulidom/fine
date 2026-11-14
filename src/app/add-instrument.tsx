@@ -1,4 +1,4 @@
-import { Feather } from '@expo/vector-icons'
+import * as Icon from '@/components/ui/PhosphorIcons'
 import { useFocusEffect } from '@react-navigation/native'
 import { useRouter } from 'expo-router'
 import { useCallback, useState } from 'react'
@@ -39,7 +39,7 @@ export default function AddInstrumentScreen() {
             marginBottom: 42,
           }}
         >
-          <Feather name='arrow-left' size={23} color={ink} />
+          <Icon.ArrowLeftIcon size={23} color={ink} />
         </Pressable>
         <Text
           style={{

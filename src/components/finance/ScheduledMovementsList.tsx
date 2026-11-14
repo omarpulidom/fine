@@ -1,4 +1,5 @@
-import { Feather } from '@expo/vector-icons'
+import * as Icon from '@/components/ui/PhosphorIcons'
+import { FinanceIcon } from '@/components/ui/FinanceIcon'
 import { useMemo, useState } from 'react'
 import { Pressable, ScrollView, Text, View } from 'react-native'
 import { formatDateDisplay, formatShortDateKey } from '@/features/finance/dates'
@@ -252,7 +253,7 @@ export function ScheduledMovementsList({
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <View style={{ width: 30, height: 30, borderRadius: 15,
                     backgroundColor: '#f1f1f1', alignItems: 'center', justifyContent: 'center' }}>
-                    <Feather name={cycle ? 'credit-card' : type === 'income' ? 'arrow-down-left'
+                    <FinanceIcon name={cycle ? 'credit-card' : type === 'income' ? 'arrow-down-left'
                       : type === 'transfer' ? 'repeat' : 'arrow-up-right'} size={15} color={ink} />
                   </View>
                   <Text numberOfLines={1}
@@ -270,7 +271,7 @@ export function ScheduledMovementsList({
                       hitSlop={8}
                       style={{ width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }}
                     >
-                      <Feather name='x' size={16} color={muted} />
+                      <Icon.XIcon size={16} color={muted} />
                     </Pressable>
                   )}
                 </View>
@@ -314,7 +315,7 @@ export function ScheduledMovementsList({
           >
             <View style={{ width: 30, height: 30, borderRadius: 15,
               backgroundColor: '#f1f1f1', alignItems: 'center', justifyContent: 'center' }}>
-              <Feather name='arrow-right' size={16} color={ink} />
+              <Icon.ArrowRightIcon size={16} color={ink} />
             </View>
             <View>
               <Text style={{ color: ink, fontFamily: medium, fontSize: 15 }}>Ver todos</Text>
@@ -421,7 +422,7 @@ export function ScheduledMovementsList({
                         justifyContent: 'center',
                       }}
                     >
-                      <Feather name='check-circle' size={17} color={muted} />
+                      <Icon.CheckCircleIcon size={17} color={muted} />
                     </Pressable>
                     <Pressable
                       onPress={() => onDelete(movement, item.date)}
@@ -434,7 +435,7 @@ export function ScheduledMovementsList({
                         justifyContent: 'center',
                       }}
                     >
-                      <Feather name='trash-2' size={16} color={muted} />
+                      <Icon.TrashIcon size={16} color={muted} />
                     </Pressable>
                   </View>
                 ) : (
@@ -449,7 +450,7 @@ export function ScheduledMovementsList({
                       justifyContent: 'center',
                     }}
                   >
-                    <Feather name='chevron-right' size={17} color={muted} />
+                    <Icon.CaretRightIcon size={17} color={muted} />
                   </Pressable>
                 )}
               </View>

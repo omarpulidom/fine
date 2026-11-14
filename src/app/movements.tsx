@@ -1,4 +1,4 @@
-import { Feather } from '@expo/vector-icons'
+import * as Icon from '@/components/ui/PhosphorIcons'
 import { BottomSheetTextInput as TextInput } from '@gorhom/bottom-sheet'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useState } from 'react'
@@ -151,7 +151,7 @@ export default function MovementsScreen() {
             accessibilityRole='button'
             accessibilityLabel='Volver'
           >
-            <Feather name='arrow-left' size={23} color={INK} />
+            <Icon.ArrowLeftIcon size={23} color={INK} />
           </Pressable>
           <Text
             style={{
@@ -201,7 +201,7 @@ export default function MovementsScreen() {
             gap: 8,
           }}
         >
-          <Feather name='plus' size={18} color='#fff' />
+          <Icon.PlusIcon size={18} color='#fff' />
           <Text
             style={{
               fontFamily: medium,
@@ -297,7 +297,7 @@ export default function MovementsScreen() {
                 accessibilityRole='button'
                 accessibilityLabel='Eliminar movimiento'
               >
-                <Feather name='trash-2' size={17} color={MUTED} />
+                <Icon.TrashIcon size={17} color={MUTED} />
               </Pressable>
             </View>
           )

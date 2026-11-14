@@ -1,4 +1,4 @@
-import { Feather } from '@expo/vector-icons'
+import * as Icon from '@/components/ui/PhosphorIcons'
 import { useFocusEffect } from '@react-navigation/native'
 import { useRouter } from 'expo-router'
 import { useCallback, useState } from 'react'
@@ -101,7 +101,7 @@ export default function StatsScreen() {
             marginBottom: 38,
           }}
         >
-          <Feather name='arrow-left' size={22} color={ink} />
+          <Icon.ArrowLeftIcon size={22} color={ink} />
         </Pressable>
         <Text
           style={{
@@ -134,7 +134,7 @@ export default function StatsScreen() {
           }}
         >
           <Pressable onPress={() => shiftMonth(-1)} accessibilityLabel='Mes anterior' hitSlop={10}>
-            <Feather name='chevron-left' size={22} color={ink} />
+            <Icon.CaretLeftIcon size={22} color={ink} />
           </Pressable>
           <Text
             style={{
@@ -147,7 +147,7 @@ export default function StatsScreen() {
             {monthLabel}
           </Text>
           <Pressable onPress={() => shiftMonth(1)} accessibilityLabel='Mes siguiente' hitSlop={10}>
-            <Feather name='chevron-right' size={22} color={ink} />
+            <Icon.CaretRightIcon size={22} color={ink} />
           </Pressable>
         </View>
         <View

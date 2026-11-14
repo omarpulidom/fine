@@ -1,4 +1,5 @@
-import { Feather } from '@expo/vector-icons'
+import * as Icon from '@/components/ui/PhosphorIcons'
+import { FinanceIcon } from '@/components/ui/FinanceIcon'
 import {
   createContext,
   type ReactNode,
@@ -187,7 +188,7 @@ function TransitionOverlay({
             top: insets.top + 22,
           }}
         >
-          <Feather name='x' size={23} color='#101010' />
+          <Icon.XIcon size={23} color='#101010' />
         </View>
         <View
           style={{
@@ -225,7 +226,7 @@ function TransitionOverlay({
               padding: 8,
             }}
           >
-            <Feather
+            <FinanceIcon
               name={transition.instrument.kind === 'card' ? 'credit-card' : 'briefcase'}
               size={18}
               color='#101010'

@@ -1,4 +1,5 @@
-import { Feather } from '@expo/vector-icons'
+import * as Icon from '@/components/ui/PhosphorIcons'
+import { FinanceIcon } from '@/components/ui/FinanceIcon'
 import { Text, View } from 'react-native'
 import { getAccountDesign } from '@/features/finance/accountDesigns'
 import { getCardDesign } from '@/features/finance/cardDesigns'
@@ -215,7 +216,7 @@ export function InstrumentDetailPreview({
                   justifyContent: 'center',
                 }}
               >
-                <Feather name={item.icon} size={card ? 17 : 18} color='#101010' />
+                <FinanceIcon name={item.icon} size={card ? 17 : 18} color='#101010' />
               </View>
               <View
                 style={{
@@ -253,7 +254,7 @@ export function InstrumentDetailPreview({
                 {item.sign}
                 {formatMoney(item.amountCents)}
               </Text>
-              {card && <Feather name='trash-2' size={16} color='#888' />}
+              {card && <Icon.TrashIcon size={16} color='#888' />}
             </View>
           ))
         ) : (
@@ -342,7 +343,7 @@ export function InstrumentDetailPreview({
               {nextCycle.automatic && !nextCycle.dueDateConfirmed ? ' estimado' : ''}
             </Text>
           </View>
-          <Feather name='edit-2' size={17} color='#888' />
+          <Icon.PencilSimpleIcon size={17} color='#888' />
         </View>
       )}
     </View>

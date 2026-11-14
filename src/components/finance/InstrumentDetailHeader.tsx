@@ -1,11 +1,10 @@
-import { Feather } from '@expo/vector-icons'
-import type { ComponentProps } from 'react'
+import { FinanceIcon, type FinanceIconName } from '@/components/ui/FinanceIcon'
 import { Image, type ImageSourcePropType, Pressable, Text, View } from 'react-native'
 import { formatMoney } from '@/features/finance/money'
 
 type Action = {
   label: string
-  icon: ComponentProps<typeof Feather>['name']
+  icon: FinanceIconName
   onPress: () => void
   disabled?: boolean
 }
@@ -64,7 +63,7 @@ export function InstrumentCardArt({
               justifyContent: 'space-between',
             }}
           >
-            <Feather name={isCreditCard ? 'credit-card' : 'briefcase'} size={29} color={ink} />
+            <FinanceIcon name={isCreditCard ? 'credit-card' : 'briefcase'} size={29} color={ink} />
             <Text
               style={{
                 fontFamily: medium,
@@ -187,7 +186,7 @@ export function InstrumentDetailHeader({
                 justifyContent: 'center',
               }}
             >
-              <Feather name={action.icon} size={20} color={ink} />
+              <FinanceIcon name={action.icon} size={20} color={ink} />
             </View>
             <Text
               style={{

@@ -1,4 +1,5 @@
-import { Feather } from '@expo/vector-icons'
+import * as Icon from '@/components/ui/PhosphorIcons'
+import { FinanceIcon } from '@/components/ui/FinanceIcon'
 import { BottomSheetTextInput as TextInput } from '@gorhom/bottom-sheet'
 import { useFocusEffect } from '@react-navigation/native'
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
@@ -508,7 +509,7 @@ export default function CardsScreen() {
           accessibilityLabel='Cerrar detalle'
           style={{ alignSelf: 'flex-start', padding: 3 }}
         >
-          <Feather name='x' size={23} color={INK} />
+          <Icon.XIcon size={23} color={INK} />
         </Pressable>
       </View>
       <ScrollView
@@ -595,7 +596,7 @@ export default function CardsScreen() {
                 >
                   <View style={{ width: 38, height: 38, borderRadius: 19,
                     backgroundColor: '#f0f0f0', alignItems: 'center', justifyContent: 'center' }}>
-                    <Feather name={item.type === 'purchase' ? 'shopping-bag' : 'arrow-down-left'}
+                    <FinanceIcon name={item.type === 'purchase' ? 'shopping-bag' : 'arrow-down-left'}
                       size={17} color={INK} />
                   </View>
                   <Pressable
@@ -645,7 +646,7 @@ export default function CardsScreen() {
                     hitSlop={10}
                     accessibilityLabel='Eliminar registro'
                   >
-                    <Feather name='trash-2' size={16} color={MUTED} />
+                    <Icon.TrashIcon size={16} color={MUTED} />
                   </Pressable>
                 </View>
               ))}
@@ -686,7 +687,7 @@ export default function CardsScreen() {
                       {nextCycle.automatic && !nextCycle.dueDateConfirmed ? ' estimado' : ''}
                     </Text>
                   </View>
-                  <Feather name='edit-2' size={17} color={MUTED} />
+                  <Icon.PencilSimpleIcon size={17} color={MUTED} />
                 </Pressable>
               )}
             </View>
@@ -854,7 +855,7 @@ export default function CardsScreen() {
                                 padding: 22,
                               }}
                             >
-                              <Feather name='credit-card' size={30} color={INK} />
+                              <Icon.CreditCardIcon size={30} color={INK} />
                               <Text
                                 style={{
                                   fontFamily: medium,

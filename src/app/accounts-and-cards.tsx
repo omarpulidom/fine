@@ -1,4 +1,5 @@
-import { Feather } from '@expo/vector-icons'
+import * as Icon from '@/components/ui/PhosphorIcons'
+import { FinanceIcon } from '@/components/ui/FinanceIcon'
 import { useFocusEffect } from '@react-navigation/native'
 import { useRouter } from 'expo-router'
 import { useCallback, useRef, useState } from 'react'
@@ -76,7 +77,7 @@ function InstrumentListRow({
         {image ? (
           <Image source={image} resizeMode='contain' style={{ width: 54, height: 35 }} />
         ) : (
-          <Feather name={isCreditCard ? 'credit-card' : 'briefcase'} size={20} color={muted} />
+          <FinanceIcon name={isCreditCard ? 'credit-card' : 'briefcase'} size={20} color={muted} />
         )}
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
@@ -145,7 +146,7 @@ export default function AccountsAndCardsScreen() {
             marginBottom: 32,
           }}
         >
-          <Feather name='arrow-left' size={23} color={ink} />
+          <Icon.ArrowLeftIcon size={23} color={ink} />
         </Pressable>
         <Text
           style={{
@@ -237,7 +238,7 @@ export default function AccountsAndCardsScreen() {
             backgroundColor: ink, flexDirection: 'row', alignItems: 'center',
             justifyContent: 'center', gap: 9, paddingHorizontal: 22 }}
         >
-          <Feather name='plus' size={19} color='#fff' />
+          <Icon.PlusIcon size={19} color='#fff' />
           <Text style={{ fontFamily: medium, fontSize: 15, color: '#fff' }}>Agregar</Text>
         </Pressable>
       </View>

@@ -1,4 +1,4 @@
-import { Feather } from '@expo/vector-icons'
+import * as Icon from '@/components/ui/PhosphorIcons'
 import { BottomSheetTextInput } from '@gorhom/bottom-sheet'
 import { useFocusEffect } from '@react-navigation/native'
 import { useRouter } from 'expo-router'
@@ -264,7 +264,7 @@ export default function SimulatorScreen() {
             marginBottom: 38,
           }}
         >
-          <Feather name='arrow-left' size={22} color={ink} />
+          <Icon.ArrowLeftIcon size={22} color={ink} />
         </Pressable>
         <Text
           style={{
