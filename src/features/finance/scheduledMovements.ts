@@ -2,6 +2,7 @@ import { storageMMKV } from '@/lib/mmkv/stores'
 import { addDaysKey, addMonthsKey, isDateKey } from './dates'
 
 const STORAGE_KEY = 'finance:scheduled-movements:v1'
+const SKIPPED_OCCURRENCES_KEY = 'finance:skipped-scheduled-occurrences:v1'
 
 export type ScheduledMovement = {
   id: string
@@ -64,6 +65,37 @@ export function saveScheduledMovement(movement: ScheduledMovement): ScheduledMov
 export function deleteScheduledMovement(id: string): ScheduledMovement[] {
   const next = getScheduledMovements().filter((movement) => movement.id !== id)
   storageMMKV.set(STORAGE_KEY, JSON.stringify(next))
+  storageMMKV.set(
+    SKIPPED_OCCURRENCES_KEY,
+    JSON.stringify(getSkippedOccurrences().filter((key) => !key.startsWith(`${id}:`))),
+  )
+  return next
+}
+
+export function getSkippedOccurrences(): string[] {
+  const raw = storageMMKV.getString(SKIPPED_OCCURRENCES_KEY)
+  if (!raw) return []
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    return Array.isArray(parsed)
+      ? parsed.filter((value): value is string => {
+          if (typeof value !== 'string') return false
+          const separator = value.lastIndexOf(':')
+          return separator > 0 && isDateKey(value.slice(separator + 1))
+        })
+      : []
+  } catch {
+    return []
+  }
+}
+
+export function skipScheduledOccurrence(movementId: string, date: string): string[] {
+  const movement = getScheduledMovements().find((item) => item.id === movementId)
+  if (!movement?.recurrence || !isDateKey(date)) {
+    throw new Error('No se puede omitir este periodo.')
+  }
+  const next = [...new Set([...getSkippedOccurrences(), `${movementId}:${date}`])]
+  storageMMKV.set(SKIPPED_OCCURRENCES_KEY, JSON.stringify(next))
   return next
 }
 

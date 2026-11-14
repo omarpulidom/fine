@@ -1,8 +1,8 @@
 import { Feather } from '@expo/vector-icons'
 import { useMemo, useState } from 'react'
-import { Pressable, Text, View } from 'react-native'
-import { formatDateDisplay } from '@/features/finance/dates'
-import type { Ledger } from '@/features/finance/ledger'
+import { Pressable, ScrollView, Text, View } from 'react-native'
+import { formatDateDisplay, formatShortDateKey } from '@/features/finance/dates'
+import { type Ledger, statementAmountCents } from '@/features/finance/ledger'
 import { formatMoney } from '@/features/finance/money'
 import { nextOccurrenceDate, type ScheduledMovement } from '@/features/finance/scheduledMovements'
 
@@ -16,6 +16,7 @@ type ListItem =
   | {
       kind: 'card'
       date: string
+      amountCents: number
       cycle: Ledger['cycles'][number]
     }
 
@@ -26,14 +27,16 @@ type Props = {
   todayKey: string
   onEdit: (movement: ScheduledMovement) => void
   onComplete: (movement: ScheduledMovement) => void
-  onDelete: (movement: ScheduledMovement) => void
+  onDelete: (movement: ScheduledMovement, occurrenceDate: string) => void
   onOpenCard: (cardId: string) => void
 }
 
 const ink = '#101010'
 const muted = '#898989'
 const regular = 'Inter_400Regular'
+const light = 'Inter_300Light'
 const medium = 'Inter_500Medium'
+const semibold = 'Inter_600SemiBold'
 
 function displayDate(date: string) {
   return formatDateDisplay(new Date(`${date}T12:00:00`))
@@ -57,6 +60,7 @@ export function ScheduledMovementsList({
   onOpenCard,
 }: Props) {
   const [filter, setFilter] = useState<Filter>('all')
+  const [expanded, setExpanded] = useState(false)
   const items = useMemo<ListItem[]>(() => {
     const movementItems: ListItem[] = movements.flatMap((movement) => {
       const date = nextOccurrenceDate(movement, completedOccurrences)
@@ -70,17 +74,17 @@ export function ScheduledMovementsList({
           ]
         : []
     })
-    const cardItems: ListItem[] = ledger.cycles.flatMap((cycle) =>
-      cycle.scheduledDate && cycle.scheduledAmountCents > cycle.paidAmountCents
-        ? [
-            {
-              kind: 'card',
-              date: cycle.scheduledDate,
-              cycle,
-            },
-          ]
-        : [],
-    )
+    const cardItems: ListItem[] = ledger.cycles.flatMap((cycle) => {
+      const automatic = cycle.paymentMode === 'automatic'
+      const total = automatic
+        ? statementAmountCents(ledger, cycle.id)
+        : cycle.scheduledAmountCents
+      const amountCents = Math.max(0, total - cycle.paidAmountCents)
+      const date = automatic ? cycle.dueDate : cycle.scheduledDate
+      return amountCents > 0 && date
+        ? [{ kind: 'card', date, amountCents, cycle }]
+        : []
+    })
     return [
       ...movementItems,
       ...cardItems,
@@ -88,7 +92,7 @@ export function ScheduledMovementsList({
   }, [
     movements,
     completedOccurrences,
-    ledger.cycles,
+    ledger,
   ])
   const visibleItems = items.filter((item) => {
     if (filter === 'all') return true
@@ -110,17 +114,40 @@ export function ScheduledMovementsList({
     },
   ] as const
 
+  function details(item: ListItem) {
+    const movement = item.kind === 'movement' ? item.movement : null
+    const cycle = item.kind === 'card' ? item.cycle : null
+    const type = movement?.type ?? 'expense'
+    const title = movement
+      ? movement.description ||
+        (type === 'income' ? 'Ingreso' : type === 'expense' ? 'Gasto' : 'Transferencia')
+      : `Pago de ${ledger.cards.find((card) => card.id === cycle?.cardId)?.name ?? 'tarjeta'}`
+    const amount = movement ? movement.amountCents : item.kind === 'card' ? item.amountCents : 0
+    const accountName = movement?.accountId
+      ? ledger.accounts.find((account) => account.id === movement.accountId)?.name
+      : null
+    const metadata = [
+      item.date < todayKey ? `Pendiente desde ${displayDate(item.date)}` : displayDate(item.date),
+      movement ? recurrenceLabel(movement) : 'Tarjeta de crédito',
+      accountName,
+    ]
+      .filter(Boolean)
+      .join(' · ')
+    return { movement, cycle, type, title, amount, metadata }
+  }
+
   return (
     <View>
-      <Text
-        style={{
-          color: muted,
-          fontFamily: regular,
-          fontSize: 14,
-        }}
-      >
-        Movimientos programados
-      </Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Text style={{ color: muted, fontFamily: regular, fontSize: 14 }}>
+          Movimientos programados
+        </Text>
+        {expanded && (
+          <Pressable onPress={() => setExpanded(false)} accessibilityRole='button'>
+            <Text style={{ color: ink, fontFamily: medium, fontSize: 12 }}>Mostrar menos</Text>
+          </Pressable>
+        )}
+      </View>
       <View
         style={{
           flexDirection: 'row',
@@ -183,30 +210,96 @@ export function ScheduledMovementsList({
                 : 'Aún no hay movimientos programados'}
           </Text>
         </View>
+      ) : !expanded ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ gap: 10, paddingTop: 9, paddingBottom: 4 }}
+        >
+          {visibleItems.slice(0, 4).map((item) => {
+            const { movement, cycle, type, title, amount } = details(item)
+            return (
+              <Pressable
+                key={movement ? `movement-${movement.id}` : `card-${cycle?.id}`}
+                onPress={() => {
+                  if (movement) onEdit(movement)
+                  else if (cycle) onOpenCard(cycle.cardId)
+                }}
+                accessibilityRole='button'
+                accessibilityLabel={`${title}, ${formatShortDateKey(item.date)}, ${formatMoney(amount)}`}
+                style={{
+                  width: 166,
+                  height: 148,
+                  borderRadius: 14,
+                  backgroundColor: '#fff',
+                  padding: 14,
+                  justifyContent: 'space-between',
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Text numberOfLines={1}
+                    style={{ flex: 1, color: muted, fontFamily: light, fontSize: 11 }}>
+                    {formatShortDateKey(item.date)}
+                  </Text>
+                  {movement && (
+                    <Pressable
+                      onPress={(event) => {
+                        event.stopPropagation()
+                        onDelete(movement, item.date)
+                      }}
+                      accessibilityRole='button'
+                      accessibilityLabel={`Eliminar ${title} del ${formatShortDateKey(item.date)}`}
+                      hitSlop={8}
+                      style={{ width: 23, height: 23, alignItems: 'center', justifyContent: 'center' }}
+                    >
+                      <Feather name='x' size={17} color={muted} />
+                    </Pressable>
+                  )}
+                </View>
+                <Text numberOfLines={2}
+                  style={{ color: ink, fontFamily: medium, fontSize: 14, lineHeight: 19 }}>
+                  {title}
+                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 3 }}>
+                  <Text style={{ color: muted, fontFamily: light, fontSize: 19 }}>
+                    {type === 'income' ? '+' : type === 'transfer' ? '↔' : '−'}
+                  </Text>
+                  <Text numberOfLines={1} adjustsFontSizeToFit
+                    style={{ flex: 1, color: ink, fontFamily: semibold, fontSize: 18 }}>
+                    {formatMoney(amount)}
+                  </Text>
+                </View>
+                <View style={{ alignSelf: 'flex-start', borderRadius: 999,
+                  backgroundColor: '#f2f2f2', paddingHorizontal: 8, paddingVertical: 4 }}>
+                  <Text style={{ color: muted, fontFamily: regular, fontSize: 10 }}>
+                    {movement ? recurrenceLabel(movement) ?? 'Único' : 'Tarjeta'}
+                  </Text>
+                </View>
+              </Pressable>
+            )
+          })}
+          <Pressable
+            onPress={() => setExpanded(true)}
+            accessibilityRole='button'
+            accessibilityLabel='Ver todos los movimientos programados'
+            style={{
+              width: 118,
+              height: 148,
+              borderRadius: 14,
+              backgroundColor: '#eaeaea',
+              padding: 14,
+              justifyContent: 'space-between',
+            }}
+          >
+            <Feather name='arrow-right' size={18} color={ink} />
+            <Text style={{ color: ink, fontFamily: medium, fontSize: 13 }}>
+              Ver todos{visibleItems.length > 4 ? `\n+${visibleItems.length - 4} más` : ''}
+            </Text>
+          </Pressable>
+        </ScrollView>
       ) : (
         visibleItems.map((item) => {
-          const movement = item.kind === 'movement' ? item.movement : null
-          const cycle = item.kind === 'card' ? item.cycle : null
-          const type = movement?.type ?? 'expense'
-          const title = movement
-            ? movement.description ||
-              (type === 'income' ? 'Ingreso' : type === 'expense' ? 'Gasto' : 'Transferencia')
-            : `Pago de ${ledger.cards.find((card) => card.id === cycle?.cardId)?.name ?? 'tarjeta'}`
-          const amount = movement
-            ? movement.amountCents
-            : (cycle?.scheduledAmountCents ?? 0) - (cycle?.paidAmountCents ?? 0)
-          const accountName = movement?.accountId
-            ? ledger.accounts.find((account) => account.id === movement.accountId)?.name
-            : null
-          const metadata = [
-            item.date < todayKey
-              ? `Pendiente desde ${displayDate(item.date)}`
-              : displayDate(item.date),
-            movement ? recurrenceLabel(movement) : 'Tarjeta de crédito',
-            accountName,
-          ]
-            .filter(Boolean)
-            .join(' · ')
+          const { movement, cycle, type, title, amount, metadata } = details(item)
           return (
             <View
               key={movement ? `movement-${movement.id}` : `card-${cycle?.id}`}
@@ -302,7 +395,7 @@ export function ScheduledMovementsList({
                       <Feather name='check-circle' size={17} color={muted} />
                     </Pressable>
                     <Pressable
-                      onPress={() => onDelete(movement)}
+                      onPress={() => onDelete(movement, item.date)}
                       accessibilityRole='button'
                       accessibilityLabel={`Eliminar ${title}`}
                       style={{

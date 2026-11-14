@@ -13,7 +13,7 @@ import { allocateInstallments } from '@/features/finance/installments'
 import { getLedger, projectedCardPayments, totalLiquidity } from '@/features/finance/ledger'
 import { formatMoney, formatMoneyInput, parseAmount } from '@/features/finance/money'
 import { projectLiquidity } from '@/features/finance/projection'
-import { getScheduledMovements } from '@/features/finance/scheduledMovements'
+import { getScheduledMovements, getSkippedOccurrences } from '@/features/finance/scheduledMovements'
 import { type PurchaseScenario, simulatePurchase } from '@/features/finance/simulation'
 
 const ink = '#101010'
@@ -27,6 +27,7 @@ export default function SimulatorScreen() {
   const { width } = useWindowDimensions()
   const [ledger, setLedger] = useState(getLedger)
   const [movements, setMovements] = useState(getScheduledMovements)
+  const [skippedOccurrences, setSkippedOccurrences] = useState(getSkippedOccurrences)
   const [todayKey, setTodayKey] = useState(localDateKey(new Date()))
   const [open, setOpen] = useState(false)
   const [scenario, setScenario] = useState<PurchaseScenario | null>(null)
@@ -46,19 +47,22 @@ export default function SimulatorScreen() {
     useCallback(() => {
       setLedger(getLedger())
       setMovements(getScheduledMovements())
+      setSkippedOccurrences(getSkippedOccurrences())
       setTodayKey(localDateKey(new Date()))
     }, []),
   )
 
   const completed = useMemo(
     () =>
-      new Set(
-        ledger.completedMovements
+      new Set([
+        ...skippedOccurrences,
+        ...ledger.completedMovements
           .filter((item) => item.sourceScheduledId && item.sourceOccurrenceDate)
           .map((item) => `${item.sourceScheduledId}:${item.sourceOccurrenceDate}`),
-      ),
+      ]),
     [
       ledger,
+      skippedOccurrences,
     ],
   )
   const cardPayments = projectedCardPayments(ledger)

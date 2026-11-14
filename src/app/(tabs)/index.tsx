@@ -29,9 +29,11 @@ import { ScheduledMovementModal } from "@/features/finance/ScheduledMovementModa
 import {
   deleteScheduledMovement,
   getScheduledMovements,
+  getSkippedOccurrences,
   nextOccurrenceDate,
   type ScheduledMovement,
   saveScheduledMovement,
+  skipScheduledOccurrence,
 } from "@/features/finance/scheduledMovements";
 
 const BACKGROUND = "#f6f6f6";
@@ -61,6 +63,7 @@ export default function HomeTab() {
   const [movements, setMovements] = useState<ScheduledMovement[]>(
     getScheduledMovements,
   );
+  const [skippedOccurrences, setSkippedOccurrences] = useState(getSkippedOccurrences);
   const [movementModalVisible, setMovementModalVisible] = useState(false);
   const [editingScheduled, setEditingScheduled] =
     useState<ScheduledMovement | null>(null);
@@ -72,20 +75,22 @@ export default function HomeTab() {
     useCallback(() => {
       setToday(new Date());
       setLedger(getLedger());
+      setSkippedOccurrences(getSkippedOccurrences());
       setSelectedDay(0);
     }, []),
   );
   const todayKey = localDateKey(today);
   const completedOccurrences = useMemo(
     () =>
-      new Set(
-        ledger.completedMovements
+      new Set([
+        ...skippedOccurrences,
+        ...ledger.completedMovements
           .filter((item) => item.sourceScheduledId && item.sourceOccurrenceDate)
           .map(
             (item) => `${item.sourceScheduledId}:${item.sourceOccurrenceDate}`,
           ),
-      ),
-    [ledger.completedMovements],
+      ]),
+    [ledger.completedMovements, skippedOccurrences],
   );
   const cardPayments = useMemo(
     () => projectedCardPayments(ledger),
@@ -227,7 +232,28 @@ export default function HomeTab() {
     );
   }
 
-  function confirmDeleteMovement(movement: ScheduledMovement) {
+  function confirmDeleteMovement(movement: ScheduledMovement, occurrenceDate: string) {
+    const removeAll = () => {
+      setMovements(deleteScheduledMovement(movement.id));
+      setSkippedOccurrences(getSkippedOccurrences());
+    };
+    if (movement.recurrence) {
+      Alert.alert("Eliminar movimiento", "¿Solo este periodo o toda la programación?", [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Solo este periodo",
+          onPress: () => {
+            try {
+              setSkippedOccurrences(skipScheduledOccurrence(movement.id, occurrenceDate));
+            } catch (caught) {
+              Alert.alert("No se pudo omitir", caught instanceof Error ? caught.message : "");
+            }
+          },
+        },
+        { text: "Eliminar siempre", style: "destructive", onPress: removeAll },
+      ]);
+      return;
+    }
     Alert.alert(
       "Eliminar movimiento",
       "Este movimiento dejará de afectar la proyección.",
@@ -239,7 +265,7 @@ export default function HomeTab() {
         {
           text: "Eliminar",
           style: "destructive",
-          onPress: () => setMovements(deleteScheduledMovement(movement.id)),
+          onPress: removeAll,
         },
       ],
     );
