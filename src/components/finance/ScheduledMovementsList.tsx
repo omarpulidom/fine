@@ -6,7 +6,8 @@ import { type Ledger, statementAmountCents } from '@/features/finance/ledger'
 import { formatMoney } from '@/features/finance/money'
 import { nextOccurrenceDate, type ScheduledMovement } from '@/features/finance/scheduledMovements'
 
-type Filter = 'all' | 'income' | 'expense'
+type Filter = 'all' | 'income' | 'expense' | 'once' | 'weekly' | 'biweekly' | 'monthly'
+type FrequencyFilter = Extract<Filter, 'once' | 'weekly' | 'biweekly' | 'monthly'>
 type ListItem =
   | {
       kind: 'movement'
@@ -61,7 +62,7 @@ export function ScheduledMovementsList({
   mode = 'carousel',
   onViewAll,
 }: Props) {
-  const [filter, setFilter] = useState<Filter>('all')
+  const [selectedFilters, setSelectedFilters] = useState<Filter[]>(['all'])
   const items = useMemo<ListItem[]>(() => {
     const movementItems: ListItem[] = movements.flatMap((movement) => {
       const date = nextOccurrenceDate(movement, completedOccurrences)
@@ -95,10 +96,16 @@ export function ScheduledMovementsList({
     completedOccurrences,
     ledger,
   ])
+  const selectedTypes = selectedFilters.filter((value): value is 'income' | 'expense' =>
+    value === 'income' || value === 'expense')
+  const selectedFrequencies = selectedFilters.filter((value): value is FrequencyFilter =>
+    value === 'once' || value === 'weekly' || value === 'biweekly' || value === 'monthly')
   const visibleItems = items.filter((item) => {
-    if (filter === 'all') return true
-    if (item.kind === 'card') return filter === 'expense'
-    return item.movement.type === filter
+    if (selectedFilters.includes('all')) return true
+    const type = item.kind === 'card' ? 'expense' : item.movement.type
+    const frequency = item.kind === 'card' ? 'monthly' : item.movement.recurrence ?? 'once'
+    return (selectedTypes.length === 0 || (type !== 'transfer' && selectedTypes.includes(type))) &&
+      (selectedFrequencies.length === 0 || selectedFrequencies.includes(frequency))
   })
   const filters = [
     {
@@ -113,7 +120,22 @@ export function ScheduledMovementsList({
       value: 'expense',
       label: 'Gastos',
     },
+    { value: 'once', label: 'Único' },
+    { value: 'weekly', label: 'Semanal' },
+    { value: 'biweekly', label: 'Quincenal' },
+    { value: 'monthly', label: 'Mensual' },
   ] as const
+
+  function toggleFilter(value: Filter) {
+    setSelectedFilters((current) => {
+      if (value === 'all') return ['all']
+      const selected = current.filter((item) => item !== 'all')
+      const next = selected.includes(value)
+        ? selected.filter((item) => item !== value)
+        : [...selected, value]
+      return next.length ? next : ['all']
+    })
+  }
 
   function details(item: ListItem) {
     const movement = item.kind === 'movement' ? item.movement : null
@@ -144,32 +166,26 @@ export function ScheduledMovementsList({
           Movimientos programados
         </Text>
       )}
-      <View
-        style={{
-          flexDirection: 'row',
-          gap: 7,
-          marginTop: 13,
-          marginBottom: 3,
-        }}
-      >
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7,
+        marginTop: 13, marginBottom: 3 }}>
         {filters.map((option) => (
           <Pressable
             key={option.value}
-            onPress={() => setFilter(option.value)}
+            onPress={() => toggleFilter(option.value)}
             accessibilityRole='button'
             accessibilityState={{
-              selected: filter === option.value,
+              selected: selectedFilters.includes(option.value),
             }}
             style={{
               borderRadius: 999,
-              backgroundColor: filter === option.value ? ink : '#e8e8e8',
+              backgroundColor: selectedFilters.includes(option.value) ? ink : '#e8e8e8',
               paddingHorizontal: 13,
               paddingVertical: 7,
             }}
           >
             <Text
               style={{
-                color: filter === option.value ? '#fff' : muted,
+                color: selectedFilters.includes(option.value) ? '#fff' : muted,
                 fontFamily: medium,
                 fontSize: 12,
               }}
@@ -199,11 +215,9 @@ export function ScheduledMovementsList({
               textAlign: 'center',
             }}
           >
-            {filter === 'income'
-              ? 'Aún no hay ingresos programados'
-              : filter === 'expense'
-                ? 'Aún no hay gastos programados'
-                : 'Aún no hay movimientos programados'}
+            {selectedFilters.includes('all')
+              ? 'Aún no hay movimientos programados'
+              : 'No hay movimientos con estos filtros'}
           </Text>
         </View>
       ) : mode === 'carousel' ? (
