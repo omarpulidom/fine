@@ -41,12 +41,14 @@ import {
   createCreditCard,
   deleteCardActivity,
   deleteCreditCard,
+  type CardRemovalTarget,
   assertCreditCardCanBeDeleted,
   getLedger,
   newCardActivityId,
   newCardId,
   newCycleId,
   projectedCardPayments,
+  removeCreditCardWithAssociations,
   reassignInstallmentPurchase,
   reassignPurchase,
   scheduleCyclePayment,
@@ -78,7 +80,7 @@ function CardFormContainer({ standalone, visible, onClose, children }: {
     </ScrollView>
   ) : <AppBottomSheet visible={visible} onClose={onClose}>{content}</AppBottomSheet>
 }
-type FormMode = 'card' | 'settings' | 'cycle' | 'purchase' | 'payment' | 'plan' | 'reassign' | null
+type FormMode = 'card' | 'settings' | 'cycle' | 'purchase' | 'payment' | 'plan' | 'reassign' | 'remove-card' | null
 
 function comparePaymentCycles(left: BillingCycle, right: BillingCycle, todayKey: string): number {
   const leftUpcoming = left.dueDate >= todayKey
@@ -174,7 +176,10 @@ export default function CardsScreen() {
   // biome-ignore lint/correctness/useExhaustiveDependencies: Clear the temporary display override when the route ID changes.
   useEffect(() => setDisplayedCardId(null), [routeCardId])
   const focusedCardId = displayedCardId ?? routeCardId
-  const [pendingDeletion, setPendingDeletion] = useState<{ id: string; target: Instrument } | null>(null)
+  const [pendingDeletion, setPendingDeletion] = useState<{
+    id: string; target: Instrument; removalTarget?: CardRemovalTarget
+  } | null>(null)
+  const [removalDestination, setRemovalDestination] = useState<CardRemovalTarget>(null)
   useFocusEffect(
     useCallback(() => {
       setLedger(getLedger())
@@ -519,7 +524,49 @@ export default function CardsScreen() {
     ])
   }
 
+  function removeCard(cardId: string, removalTarget?: CardRemovalTarget) {
+    try {
+      if (removalTarget === undefined) assertCreditCardCanBeDeleted(ledger, cardId)
+      const instruments: Instrument[] = [
+        ...ledger.accounts.map((item) => ({ id: item.id, kind: 'account' as const })),
+        ...ledger.cards.map((item) => ({ id: item.id, kind: 'card' as const })),
+      ]
+      const index = instruments.findIndex((item) => item.id === cardId && item.kind === 'card')
+      const target = instruments[index + 1] ?? instruments[index - 1]
+      setMode(null)
+      if (target && focusedCardId === cardId) {
+        setPendingDeletion({ id: cardId, target, removalTarget })
+      } else {
+        setLedger(removalTarget === undefined ? deleteCreditCard(cardId) :
+          removeCreditCardWithAssociations(cardId, removalTarget))
+        setSelectedCardId('')
+        setSelectedCycleId('')
+        if (!target) openInstrumentList()
+      }
+    } catch (caught) {
+      Alert.alert('No se puede eliminar', caught instanceof Error ? caught.message : 'Inténtalo de nuevo.')
+    }
+  }
+
   function confirmDeleteCard(cardId: string, cardName: string) {
+    const hasAssociations = getScheduledMovements().some((item) => item.cardId === cardId) ||
+      ledger.cardActivity.some((item) => item.cardId === cardId)
+    if (hasAssociations) {
+      Alert.alert('Eliminar tarjeta', `«${cardName}» tiene compras o pagos asociados.`, [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Reasignar', onPress: () => {
+          setRemovalDestination(null)
+          open('remove-card', cardId)
+        } },
+        { text: 'Eliminar asociados', style: 'destructive', onPress: () =>
+          Alert.alert('Eliminar tarjeta y registros',
+            'Se borrarán sus compras y movimientos programados. Los pagos registrados se revertirán en sus cuentas.', [
+              { text: 'Cancelar', style: 'cancel' },
+              { text: 'Eliminar todo', style: 'destructive', onPress: () => removeCard(cardId, null) },
+            ]) },
+      ])
+      return
+    }
     Alert.alert(
       'Eliminar tarjeta',
       `Se eliminará «${cardName}», su deuda y sus ciclos. Esta acción no se puede deshacer.`,
@@ -531,30 +578,7 @@ export default function CardsScreen() {
         {
           text: 'Eliminar',
           style: 'destructive',
-          onPress: () => {
-            try {
-              const instruments: Instrument[] = [
-                ...ledger.accounts.map((item) => ({ id: item.id, kind: 'account' as const })),
-                ...ledger.cards.map((item) => ({ id: item.id, kind: 'card' as const })),
-              ]
-              const index = instruments.findIndex((item) => item.id === cardId && item.kind === 'card')
-              const target = instruments[index + 1] ?? instruments[index - 1]
-              assertCreditCardCanBeDeleted(ledger, cardId)
-              if (target && focusedCardId === cardId) {
-                setPendingDeletion({ id: cardId, target })
-              } else {
-                setLedger(deleteCreditCard(cardId))
-                setSelectedCardId('')
-                setSelectedCycleId('')
-                if (!target) openInstrumentList()
-              }
-            } catch (caught) {
-              Alert.alert(
-                'No se puede eliminar',
-                caught instanceof Error ? caught.message : 'Inténtalo de nuevo.',
-              )
-            }
-          },
+          onPress: () => removeCard(cardId),
         },
       ],
     )
@@ -603,10 +627,11 @@ export default function CardsScreen() {
             progress={progress} transitionTo={pendingDeletion?.target} returnTo={returnTo}
             onTransitionEnd={() => {
               if (!pendingDeletion) return
-              const { id, target } = pendingDeletion
+              const { id, target, removalTarget } = pendingDeletion
               try {
                 if (target.kind === 'card') setDisplayedCardId(target.id)
-                setLedger(deleteCreditCard(id))
+                setLedger(removalTarget === undefined ? deleteCreditCard(id) :
+                  removeCreditCardWithAssociations(id, removalTarget))
                 setPendingDeletion(null)
                 setSelectedCardId('')
                 setSelectedCycleId('')
@@ -797,6 +822,8 @@ export default function CardsScreen() {
                 : 'Elige tu banco'
               : mode === 'settings'
                 ? 'Editar tarjeta'
+                : mode === 'remove-card'
+                  ? 'Reasignar registros'
                 : mode === 'cycle'
                   ? 'Nuevo ciclo'
                   : mode === 'purchase'
@@ -807,6 +834,30 @@ export default function CardsScreen() {
                         ? 'Editar corte'
                         : 'Cambiar ciclo'}
           </Text>
+          {mode === 'remove-card' && (
+            <View>
+              <Text style={{ fontFamily: regular, color: MUTED, fontSize: 13,
+                lineHeight: 19, marginTop: 12 }}>
+                Elige dónde mover las compras, la deuda y los movimientos programados.
+                Si eliges una cuenta, se registrarán como gastos y se ajustará su saldo.
+              </Text>
+              {[...ledger.cards.filter((item) => item.id !== selectedCardId).map((item) => ({
+                key: `card:${item.id}`, label: `Tarjeta · ${item.name}`,
+                target: { cardId: item.id } as CardRemovalTarget,
+              })), ...ledger.accounts.map((item) => ({
+                key: `account:${item.id}`, label: `Cuenta · ${item.name}`,
+                target: { accountId: item.id } as CardRemovalTarget,
+              }))].map((option) => {
+                const selected = JSON.stringify(removalDestination) === JSON.stringify(option.target)
+                return <Pressable key={option.key} onPress={() => setRemovalDestination(option.target)}
+                  accessibilityRole='button' accessibilityState={{ selected }}
+                  style={{ paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#e8e8e8' }}>
+                  <Text style={{ color: INK, fontFamily: selected ? semibold : regular,
+                    fontSize: 15 }}>{option.label}</Text>
+                </Pressable>
+              })}
+            </View>
+          )}
           {mode === 'card' && cardStep === 'details' && (
             <>
               <Label>Nombre</Label>
@@ -1195,7 +1246,21 @@ export default function CardsScreen() {
               {selectedCycle?.automatic && (
                 <>
                   <Label>Deuda anterior en este corte</Label>
-                  <Field value={billed} onChangeText={setBilled} placeholder='0.00' decimal />
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <View style={{ flex: 1 }}>
+                      <Field value={billed} onChangeText={setBilled} placeholder='0.00' decimal />
+                    </View>
+                    <Pressable onPress={() => {
+                      const available = (selectedCard?.unbilledOpeningCents ?? 0) +
+                        (selectedCycle?.openingStatementCents ?? 0)
+                      setBilled(formatMoneyInput((available / 100).toFixed(2)))
+                      setError('')
+                    }} accessibilityRole='button' accessibilityLabel='Agregar todo el saldo sin asignar'
+                      style={{ paddingHorizontal: 9, paddingVertical: 5, borderRadius: 999,
+                        backgroundColor: '#ededed' }}>
+                      <Text style={{ fontFamily: medium, fontSize: 11, color: INK }}>Agregar todo</Text>
+                    </Pressable>
+                  </View>
                   <Text style={{ fontFamily: regular, color: MUTED, fontSize: 12, marginTop: 5 }}>
                     Sin asignar: {formatMoney((selectedCard?.unbilledOpeningCents ?? 0) +
                       (selectedCycle?.openingStatementCents ?? 0))}
@@ -1265,7 +1330,15 @@ export default function CardsScreen() {
               </Text>
             </Pressable>
             <Pressable
-              onPress={mode === 'card' && cardStep === 'details' ? nextCardStep : save}
+              onPress={mode === 'remove-card'
+                ? () => {
+                    if (!removalDestination) {
+                      setError('Selecciona otra tarjeta o cuenta.')
+                      return
+                    }
+                    removeCard(selectedCardId, removalDestination)
+                  }
+                : mode === 'card' && cardStep === 'details' ? nextCardStep : save}
               style={{
                 flex: 1,
                 height: 50,
@@ -1281,7 +1354,8 @@ export default function CardsScreen() {
                   color: '#fff',
                 }}
               >
-                {mode === 'card' && cardStep === 'details' ? 'Siguiente' : 'Guardar'}
+                {mode === 'card' && cardStep === 'details' ? 'Siguiente' :
+                  mode === 'remove-card' ? 'Reasignar y eliminar' : 'Guardar'}
               </Text>
             </Pressable>
           </View>
