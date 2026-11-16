@@ -54,6 +54,7 @@ La gráfica de liquidez es el componente central:
 - Mostrar los próximos ingresos, gastos y pagos de tarjeta previstos en tarjetas compactas dentro de un carrusel horizontal, ordenadas por fecha. Los filtros permiten combinar ingresos o gastos con las frecuencias «Único», «Semanal», «Quincenal» y «Mensual»; «Todos» deselecciona los demás y queda como único filtro activo. Cada tarjeta separa el signo del importe, muestra la frecuencia y permite eliminar con una X. En recurrencias, elegir entre omitir solo esa ocurrencia, sin afectar el saldo, o eliminar toda la programación; la proyección y la lista respetan la decisión. La tarjeta final «Ver todos» abre una pantalla propia con la lista cronológica vertical, los mismos filtros y acciones para editar, marcar o eliminar movimientos.
 - Acceso inmediato a **Añadir movimiento**.
 - Programar y editar ingresos o gastos previstos en una pantalla propia con desplazamiento vertical; el selector de fechas se presenta de forma independiente para evitar superponer formularios modales.
+- Un gasto programado puede elegir una tarjeta de crédito como medio de pago. La fecha del movimiento representa la compra prevista; la liquidez se descuenta en la fecha límite del ciclo al que corresponda, no el día de la compra. El listado distingue la compra programada del pago agregado del ciclo.
 - Debajo de la fecha y el saldo principal, mostrar un carrusel horizontal de altura compartida que se ajusta al ancho de la cartera: primera página con la gráfica, leyenda y selector de periodos; segunda página con la cartera y los accesos. La fecha y el saldo principal permanecen fuera del carrusel, y la lista inferior no cambia de posición al deslizar. Al mostrar la cartera, la fecha seleccionada vuelve a hoy.
 - En la segunda página, la cartera negra ocupa todo el ancho disponible y mantiene un perfil bajo, con la liquidez total y una lengüeta sobre hasta tres tarjetas reales. Una tarjeta queda arriba; dos conservan la separación actual; tres usan una separación menor para caber detrás de la lengüeta. Debajo hay cinco accesos circulares pequeños sin texto visible, alineados a la izquierda en una fila: simular compra, estadísticas, historial, cuentas y tarjetas, y registrar movimiento. Los accesos tienen etiquetas de accesibilidad.
 - Al tocar la cartera o su lengüeta, mantenerla fija y elevar las tarjetas visibles por detrás de la lengüeta, sin sacarlas por completo ni desplazar el contenido inferior. La lengüeta forma parte de la cartera y nunca abre una cuenta. Cada tarjeta disponible abre su pantalla de detalle enfocada; las tarjetas de crédito muestran su deuda por separado y no se suman a la liquidez. El botón «+» aparece con la animación y abre la pantalla «Agregar» para elegir entre cuenta o tarjeta de crédito. El penúltimo acceso de la fila abre el listado único «Cuentas y tarjetas».
@@ -133,6 +134,8 @@ Cuando se registra una compra de crédito:
 6. Actualizar la obligación de pago vinculada al ciclo y la proyección resultante.
 
 Para compras exactamente en la fecha de corte, **no asumir** que su inclusión en ese estado de cuenta es universal: dependerá del registro/posteo bancario. Permitir reasignar el ciclo manualmente.
+
+Las compras programadas con tarjeta se asignan al primer ciclo cuyo corte es igual o posterior a la fecha prevista. Su importe se añade a la obligación proyectada de ese ciclo sin alterar la deuda actual hasta registrarlas como realizadas. Si el ciclo tiene un pago manual configurado, el cargo programado se proyecta además en la fecha límite del ciclo. Al registrarlas, se crea una compra real vinculada a la ocurrencia programada; esta sustituye el importe previsto en la proyección y evita duplicarlo. Las recurrencias siguen la misma regla en cada ocurrencia.
 
 ### 5.3 Ejemplo de fechas de corte y pago
 
@@ -326,6 +329,7 @@ Las estadísticas se **derivan** de movimientos realizados; no necesitan otra fu
 - [ ] Un gasto futuro de débito aparece desde su fecha programada, no antes.
 - [ ] Una compra de crédito no disminuye la liquidez bancaria el día de la compra.
 - [ ] Una compra de crédito se asocia al ciclo correspondiente y ajusta su obligación de pago.
+- [ ] Una compra programada con tarjeta no reduce liquidez el día previsto y se descuenta una sola vez en la fecha de pago del ciclo, incluso tras registrarla como compra real.
 - [ ] Compras antes/después del corte pueden asociarse a diferentes ciclos.
 - [ ] Un pago de tarjeta proyectado disminuye la liquidez solo en su fecha programada.
 - [ ] Marcar un pago como completado no genera un segundo descuento.
