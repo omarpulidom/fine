@@ -483,12 +483,13 @@ export default function AccountsScreen() {
     >
       <View style={{ height: 70, paddingHorizontal: 24, justifyContent: 'center' }}>
         <Pressable
-          onPress={closeDetail}
+          onPress={create === '1' ? () => router.back() : closeDetail}
           accessibilityRole='button'
-          accessibilityLabel='Cerrar detalle'
+          accessibilityLabel={create === '1' ? 'Volver' : 'Cerrar detalle'}
           style={{ alignSelf: 'flex-start', padding: 3 }}
         >
-          <Icon.XIcon size={23} color={INK} />
+          {create === '1' ? <Icon.ArrowLeftIcon size={23} color={INK} /> :
+            <Icon.XIcon size={23} color={INK} />}
         </Pressable>
       </View>
       <ScrollView

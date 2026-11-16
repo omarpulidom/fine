@@ -1,9 +1,9 @@
 import * as Icon from '@/components/ui/PhosphorIcons'
 import { FinanceIcon } from '@/components/ui/FinanceIcon'
-import { BottomSheetTextInput as TextInput } from '@gorhom/bottom-sheet'
+import { BottomSheetTextInput } from '@gorhom/bottom-sheet'
 import { useFocusEffect } from '@react-navigation/native'
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
-import { useCallback, useEffect, useState } from 'react'
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useState } from 'react'
 import {
   Alert,
   Image,
@@ -11,6 +11,7 @@ import {
   Pressable,
   ScrollView,
   Text,
+  TextInput as NativeTextInput,
   useWindowDimensions,
   View,
 } from 'react-native'
@@ -61,6 +62,22 @@ const BACKGROUND = '#f6f6f6'
 const regular = 'Inter_400Regular'
 const medium = 'Inter_500Medium'
 const semibold = 'Inter_600SemiBold'
+const StandaloneFormContext = createContext(false)
+
+function CardFormContainer({ standalone, visible, onClose, children }: {
+  standalone: boolean
+  visible: boolean
+  onClose: () => void
+  children: ReactNode
+}) {
+  const content = <StandaloneFormContext.Provider value={standalone}>{children}</StandaloneFormContext.Provider>
+  return standalone ? (
+    <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps='handled'
+      contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 12, paddingBottom: 48 }}>
+      {content}
+    </ScrollView>
+  ) : <AppBottomSheet visible={visible} onClose={onClose}>{content}</AppBottomSheet>
+}
 type FormMode = 'card' | 'settings' | 'cycle' | 'purchase' | 'payment' | 'plan' | 'reassign' | null
 
 function comparePaymentCycles(left: BillingCycle, right: BillingCycle, todayKey: string): number {
@@ -98,6 +115,7 @@ function Field({
   placeholder: string
   decimal?: boolean
 }) {
+  const TextInput = useContext(StandaloneFormContext) ? NativeTextInput : BottomSheetTextInput
   return (
     <TextInput
       value={value}
@@ -119,6 +137,7 @@ function Field({
 }
 
 function CutoffDayInput({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const TextInput = useContext(StandaloneFormContext) ? NativeTextInput : BottomSheetTextInput
   return (
     <View style={{ width: 105, marginTop: 20 }}>
       <Text style={{ fontFamily: medium, fontSize: 13, color: MUTED }}>Día de corte</Text>
@@ -216,6 +235,10 @@ export default function CardsScreen() {
   const visibleCards = ledger.cards.filter((card) => card.id === focusedCardId)
 
   function closeDetail() {
+    if (create === '1') {
+      router.back()
+      return
+    }
     const card = visibleCards[0]
     if (card && hasListOrigin && closeToList({
       instrument: { kind: 'card', id: card.id },
@@ -224,7 +247,7 @@ export default function CardsScreen() {
       navigate: () => router.back(),
     })) return
     if (returnTo === 'accounts-and-cards') openInstrumentList()
-    else if (focusedCardId || create === '1') router.back()
+    else if (focusedCardId) router.back()
     else openInstrumentList()
   }
 
@@ -363,6 +386,7 @@ export default function CardsScreen() {
                 },
           ),
         )
+        setMode(null)
         router.replace({ pathname: '/cards', params: {
           cardId: id,
           ...(create === '1' ? { returnTo: returnTo ?? 'accounts-and-cards' } : {}),
@@ -550,13 +574,14 @@ export default function CardsScreen() {
         <Pressable
           onPress={closeDetail}
           accessibilityRole='button'
-          accessibilityLabel='Cerrar detalle'
+          accessibilityLabel={create === '1' ? 'Volver' : 'Cerrar detalle'}
           style={{ alignSelf: 'flex-start', padding: 3 }}
         >
-          <Icon.XIcon size={23} color={INK} />
+          {create === '1' ? <Icon.ArrowLeftIcon size={23} color={INK} /> :
+            <Icon.XIcon size={23} color={INK} />}
         </Pressable>
       </View>
-      <ScrollView
+      {create !== '1' && <ScrollView
         style={{ flex: 1, backgroundColor: BACKGROUND }}
         nestedScrollEnabled
         contentContainerStyle={{
@@ -751,8 +776,9 @@ export default function CardsScreen() {
         })}
           </InstrumentDetailMorph>
         )}
-      </ScrollView>
-      <AppBottomSheet
+      </ScrollView>}
+      <CardFormContainer
+        standalone={create === '1'}
         visible={mode !== null}
         onClose={() => setMode(null)}
       >
@@ -760,8 +786,9 @@ export default function CardsScreen() {
           <Text
             style={{
               fontFamily: semibold,
-              fontSize: 21,
+              fontSize: create === '1' ? 28 : 21,
               color: INK,
+              marginTop: create === '1' ? 12 : 0,
             }}
           >
             {mode === 'card'
@@ -1217,7 +1244,8 @@ export default function CardsScreen() {
                   setCardStep('details')
                   setError('')
                 } else {
-                  setMode(null)
+                  if (create === '1') closeDetail()
+                  else setMode(null)
                 }
               }}
               style={{
@@ -1267,7 +1295,7 @@ export default function CardsScreen() {
             </Pressable>
           )}
         </View>
-      </AppBottomSheet>
+      </CardFormContainer>
     </SafeAreaView>
     </>
   )
