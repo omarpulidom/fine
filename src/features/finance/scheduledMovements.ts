@@ -77,6 +77,25 @@ export function deleteScheduledMovement(id: string): ScheduledMovement[] {
   return next
 }
 
+export function moveCardScheduledMovements(
+  cardId: string,
+  target: { cardId: string } | { accountId: string } | null,
+): ScheduledMovement[] {
+  const previous = getScheduledMovements()
+  const removedIds = previous.filter((movement) => movement.cardId === cardId).map((movement) => movement.id)
+  const next = previous.flatMap((movement) => {
+    if (movement.cardId !== cardId) return [movement]
+    if (!target) return []
+    return [{ ...movement, cardId: 'cardId' in target ? target.cardId : undefined,
+      accountId: 'accountId' in target ? target.accountId : undefined }]
+  })
+  storageMMKV.set(STORAGE_KEY, JSON.stringify(next))
+  if (!target) storageMMKV.set(SKIPPED_OCCURRENCES_KEY, JSON.stringify(
+    getSkippedOccurrences().filter((key) => !removedIds.some((id) => key.startsWith(`${id}:`))),
+  ))
+  return next
+}
+
 export function getSkippedOccurrences(): string[] {
   const raw = storageMMKV.getString(SKIPPED_OCCURRENCES_KEY)
   if (!raw) return []
