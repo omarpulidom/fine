@@ -1,5 +1,5 @@
-import { addDaysKey, addMonthsKey } from './dates'
-import type { ScheduledMovement } from './scheduledMovements'
+import { addDaysKey } from './dates'
+import { occurrenceDateAt, type ScheduledMovement } from './scheduledMovements'
 
 export type ProjectionPoint = {
   date: string
@@ -75,10 +75,7 @@ export function projectLiquidityBreakdown(
       }
       if (!movement.recurrence) break
       index += 1
-      occurrence =
-        movement.recurrence === 'monthly'
-          ? addMonthsKey(movement.effectiveDate, index)
-          : addDaysKey(movement.effectiveDate, index * (movement.recurrence === 'weekly' ? 7 : 14))
+      occurrence = occurrenceDateAt(movement, index)
     }
   }
 
