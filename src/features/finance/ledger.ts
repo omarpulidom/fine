@@ -222,6 +222,15 @@ export function upsertAccount(account: LiquidAccount): Ledger {
 
 export function deleteAccount(accountId: string): Ledger {
   const ledger = getLedger()
+  assertAccountCanBeDeleted(ledger, accountId)
+  return persist({
+    ...ledger,
+    accounts: ledger.accounts.filter((account) => account.id !== accountId),
+    reconciliations: ledger.reconciliations.filter((item) => item.accountId !== accountId),
+  })
+}
+
+export function assertAccountCanBeDeleted(ledger: Ledger, accountId: string): void {
   if (!ledger.accounts.some((account) => account.id === accountId)) {
     throw new Error('No se encontró la cuenta.')
   }
@@ -249,11 +258,6 @@ export function deleteAccount(accountId: string): Ledger {
   if (ledger.cardActivity.some((activity) => activity.sourceAccountId === accountId)) {
     throw new Error('Esta cuenta tiene pagos de tarjeta registrados. Elimínalos primero.')
   }
-  return persist({
-    ...ledger,
-    accounts: ledger.accounts.filter((account) => account.id !== accountId),
-    reconciliations: ledger.reconciliations.filter((item) => item.accountId !== accountId),
-  })
 }
 
 export function upsertCompletedMovement(movement: CompletedMovement, todayKey: string): Ledger {
@@ -431,7 +435,9 @@ export function projectedCardPayments(
         activity.cycleId === cycle.id && activity.sourceScheduledId)
       .reduce((total, activity) => total + activity.amountCents, 0)
     const manualAmount = Math.max(0, cycle.scheduledAmountCents - cycle.paidAmountCents)
-    const scheduledAmount = Math.max(0, future + actualScheduled -
+    const uncoveredScheduledPurchases = Math.max(0,
+      actualScheduled - cycle.scheduledAmountCents)
+    const scheduledAmount = Math.max(0, future + uncoveredScheduledPurchases -
       Math.max(0, cycle.paidAmountCents - cycle.scheduledAmountCents))
     return [
       ...(cycle.scheduledDate && manualAmount > 0
@@ -543,6 +549,18 @@ export function createCreditCard(card: CreditCard, initialCycle: BillingCycle | 
 
 export function deleteCreditCard(cardId: string): Ledger {
   const ledger = getLedger()
+  assertCreditCardCanBeDeleted(ledger, cardId)
+  const cycleIds = new Set(
+    ledger.cycles.filter((cycle) => cycle.cardId === cardId).map((cycle) => cycle.id),
+  )
+  return persist({
+    ...ledger,
+    cards: ledger.cards.filter((card) => card.id !== cardId),
+    cycles: ledger.cycles.filter((cycle) => !cycleIds.has(cycle.id)),
+  })
+}
+
+export function assertCreditCardCanBeDeleted(ledger: Ledger, cardId: string): void {
   if (!ledger.cards.some((card) => card.id === cardId)) {
     throw new Error('No se encontró la tarjeta.')
   }
@@ -562,11 +580,6 @@ export function deleteCreditCard(cardId: string): Ledger {
   ) {
     throw new Error('Esta tarjeta tiene compras o pagos registrados. Elimínalos primero.')
   }
-  return persist({
-    ...ledger,
-    cards: ledger.cards.filter((card) => card.id !== cardId),
-    cycles: ledger.cycles.filter((cycle) => cycle.cardId !== cardId),
-  })
 }
 
 export function updateCreditCardSettings(
