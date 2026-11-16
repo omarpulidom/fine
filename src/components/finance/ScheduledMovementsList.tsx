@@ -3,7 +3,7 @@ import { FinanceIcon } from '@/components/ui/FinanceIcon'
 import { useMemo, useState } from 'react'
 import { Pressable, ScrollView, Text, View } from 'react-native'
 import { EmptyState } from '@/components/ui/EmptyState'
-import { formatDateDisplay, formatShortDateKey } from '@/features/finance/dates'
+import { formatShortDateKey } from '@/features/finance/dates'
 import { type Ledger, statementAmountCents } from '@/features/finance/ledger'
 import { formatMoney } from '@/features/finance/money'
 import { nextOccurrenceDate, type ScheduledMovement } from '@/features/finance/scheduledMovements'
@@ -40,10 +40,6 @@ const ink = '#101010'
 const muted = '#898989'
 const regular = 'Inter_400Regular'
 const medium = 'Inter_500Medium'
-
-function displayDate(date: string) {
-  return formatDateDisplay(new Date(`${date}T12:00:00`))
-}
 
 function recurrenceLabel(movement: ScheduledMovement) {
   if (movement.recurrence === 'weekly') return 'Semanal'
@@ -148,17 +144,10 @@ export function ScheduledMovementsList({
         (type === 'income' ? 'Ingreso' : type === 'expense' ? 'Gasto' : 'Transferencia')
       : `Pago de ${ledger.cards.find((card) => card.id === cycle?.cardId)?.name ?? 'tarjeta'}`
     const amount = movement ? movement.amountCents : item.kind === 'card' ? item.amountCents : 0
-    const accountName = movement?.accountId
-      ? ledger.accounts.find((account) => account.id === movement.accountId)?.name
-      : null
-    const metadata = [
-      item.date < todayKey ? `Pendiente desde ${displayDate(item.date)}` : displayDate(item.date),
-      movement ? recurrenceLabel(movement) : 'Tarjeta de crédito',
-      accountName,
-    ]
-      .filter(Boolean)
-      .join(' · ')
-    return { movement, cycle, type, title, amount, metadata }
+    const accountId = movement?.accountId ??
+      ledger.cards.find((card) => card.id === cycle?.cardId)?.paymentSourceAccountId
+    const accountName = ledger.accounts.find((account) => account.id === accountId)?.name
+    return { movement, cycle, type, title, amount, accountName }
   }
 
   return (
@@ -315,20 +304,23 @@ export function ScheduledMovementsList({
           </Pressable>
         </ScrollView>
       ) : (
-        visibleItems.map((item) => {
-          const { movement, cycle, type, title, amount, metadata } = details(item)
+        visibleItems.map((item, index) => {
+          const { movement, cycle, type, title, amount, accountName } = details(item)
+          const startsDateGroup = index === 0 || visibleItems[index - 1].date !== item.date
           return (
             <View
               key={movement ? `movement-${movement.id}` : `card-${cycle?.id}`}
-              style={{
-                marginTop: 9,
-                borderRadius: 13,
-                backgroundColor: '#fff',
-                paddingHorizontal: 15,
-                paddingTop: 14,
-                paddingBottom: 11,
-              }}
             >
+              {startsDateGroup && (
+                <Text style={{ color: muted, fontFamily: regular, fontSize: 13,
+                  marginTop: index === 0 ? 18 : 22, marginBottom: 1 }}>
+                  {item.date < todayKey ? `Pendiente desde ${formatShortDateKey(item.date)}`
+                    : formatShortDateKey(item.date)}
+                </Text>
+              )}
+              <View style={{ paddingTop: startsDateGroup ? 5 : 10,
+                paddingBottom: 10, borderBottomWidth: 1,
+                borderBottomColor: '#e6e6e6' }}>
               <Pressable
                 onPress={() => {
                   if (movement) onEdit(movement)
@@ -338,17 +330,18 @@ export function ScheduledMovementsList({
                 accessibilityLabel={`${title}, ${type === 'income' ? 'más' : 'menos'} ${formatMoney(amount)}`}
                 style={{
                   flexDirection: 'row',
-                  alignItems: 'flex-start',
-                  gap: 8,
+                  alignItems: 'center',
+                  gap: 12,
                 }}
               >
                 <Text
-                  numberOfLines={1}
+                  numberOfLines={2}
                   style={{
                     flex: 1,
                     color: ink,
                     fontFamily: medium,
-                    fontSize: 14,
+                    fontSize: 15,
+                    lineHeight: 20,
                   }}
                 >
                   {title}
@@ -356,90 +349,71 @@ export function ScheduledMovementsList({
                 <Text
                   numberOfLines={1}
                   adjustsFontSizeToFit
+                  minimumFontScale={0.75}
                   style={{
                     color: ink,
                     fontFamily: medium,
-                    fontSize: 14,
-                    maxWidth: '46%',
+                    fontSize: 18,
+                    maxWidth: '48%',
                   }}
                 >
-                  {type === 'income' ? '+' : type === 'transfer' ? '↔ ' : '−'}
+                  <Text style={{ fontFamily: regular, color: muted }}>
+                    {type === 'income' ? '+' : type === 'transfer' ? '↔' : '−'}
+                  </Text>
                   {formatMoney(amount)}
                 </Text>
               </Pressable>
+              <Text numberOfLines={1} style={{ color: muted, fontFamily: regular,
+                fontSize: 12, marginTop: 4 }}>
+                {[movement ? recurrenceLabel(movement) ?? 'Único' : 'Tarjeta de crédito',
+                  accountName,
+                ].filter(Boolean).join(' · ')}
+              </Text>
               <View
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
-                  gap: 8,
-                  marginTop: 10,
-                  paddingTop: 9,
-                  borderTopWidth: 1,
-                  borderTopColor: '#f1f1f1',
+                  justifyContent: 'flex-end',
+                  gap: 20,
+                  marginTop: 7,
                 }}
               >
-                <Text
-                  numberOfLines={2}
-                  style={{
-                    flex: 1,
-                    color: muted,
-                    fontFamily: regular,
-                    fontSize: 11,
-                    lineHeight: 16,
-                  }}
-                >
-                  {metadata}
-                </Text>
                 {movement ? (
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 3,
-                    }}
-                  >
+                  <>
                     <Pressable
                       onPress={() => onComplete(movement)}
                       accessibilityRole='button'
                       accessibilityLabel={`Registrar ${title} como realizado`}
-                      style={{
-                        width: 31,
-                        height: 31,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
+                      hitSlop={8}
                     >
-                      <Icon.CheckCircleIcon size={17} color={muted} />
+                      <Text style={{ color: ink, fontFamily: medium, fontSize: 12 }}>
+                        Registrar
+                      </Text>
                     </Pressable>
                     <Pressable
                       onPress={() => onDelete(movement, item.date)}
                       accessibilityRole='button'
                       accessibilityLabel={`Eliminar ${title}`}
-                      style={{
-                        width: 31,
-                        height: 31,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
+                      hitSlop={8}
                     >
-                      <Icon.TrashIcon size={16} color={muted} />
+                      <Text style={{ color: muted, fontFamily: regular, fontSize: 12 }}>
+                        Eliminar
+                      </Text>
                     </Pressable>
-                  </View>
+                  </>
                 ) : (
                   <Pressable
                     onPress={() => cycle && onOpenCard(cycle.cardId)}
                     accessibilityRole='button'
                     accessibilityLabel={`Abrir ${title}`}
-                    style={{
-                      width: 31,
-                      height: 31,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
+                    hitSlop={8}
                   >
-                    <Icon.CaretRightIcon size={17} color={muted} />
+                    <Text style={{ color: ink, fontFamily: medium, fontSize: 12 }}>
+                      Ver tarjeta
+                    </Text>
                   </Pressable>
                 )}
+              </View>
               </View>
             </View>
           )
