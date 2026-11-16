@@ -304,6 +304,7 @@ export default function CardsScreen() {
     try {
       readCardDetails()
       Keyboard.dismiss()
+      setSelectedDesignId((current) => current ?? cardDesigns[0]?.id ?? null)
       setError('')
       setCardStep('design')
     } catch (caught) {

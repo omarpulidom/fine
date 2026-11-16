@@ -105,6 +105,7 @@ export default function AccountsScreen() {
       return
     }
     Keyboard.dismiss()
+    setSelectedDesignId((current) => current ?? accountDesigns[0]?.id ?? null)
     setError('')
     setAccountStep('design')
   }
