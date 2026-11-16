@@ -3,7 +3,7 @@ import { FinanceIcon } from '@/components/ui/FinanceIcon'
 import { BottomSheetTextInput } from '@gorhom/bottom-sheet'
 import { useFocusEffect } from '@react-navigation/native'
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   Alert,
   Image,
@@ -24,6 +24,7 @@ import type { Instrument } from '@/components/finance/InstrumentCardCarousel'
 import { InstrumentDetailHeader } from '@/components/finance/InstrumentDetailHeader'
 import { InstrumentDetailMorph } from '@/components/finance/InstrumentDetailMorph'
 import { useInstrumentDetailTransition } from '@/components/finance/InstrumentDetailTransition'
+import { useInstrumentListNavigation } from '@/components/finance/useInstrumentListNavigation'
 import {
   type AccountDesignId,
   accountDesigns,
@@ -32,6 +33,7 @@ import {
 import { formatShortDateKey, localDateKey } from '@/features/finance/dates'
 import {
   deleteAccount,
+  assertAccountCanBeDeleted,
   getLedger,
   type LiquidAccount,
   newAccountId,
@@ -58,7 +60,11 @@ export default function AccountsScreen() {
     returnTo?: string
   }>()
   const { hasListOrigin, closeToList } = useInstrumentDetailTransition()
+  const openInstrumentList = useInstrumentListNavigation()
   const [ledger, setLedger] = useState(getLedger)
+  const [displayedAccountId, setDisplayedAccountId] = useState<string | null>(null)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Clear the temporary display override when the route ID changes.
+  useEffect(() => setDisplayedAccountId(null), [accountId])
   const [pendingDeletion, setPendingDeletion] = useState<{ id: string; target: Instrument } | null>(null)
   useFocusEffect(useCallback(() => setLedger(getLedger()), []))
   const [editing, setEditing] = useState<LiquidAccount | null | undefined>(
@@ -73,10 +79,11 @@ export default function AccountsScreen() {
   const FormTextInput = create === '1' ? TextInput : BottomSheetTextInput
   const progress = useSharedValue(Math.max(0,
     ledger.accounts.findIndex((account) => account.id === accountId)))
-  const selectedAccount = ledger.accounts.find((account) => account.id === accountId)
+  const activeAccountId = displayedAccountId ?? accountId
+  const selectedAccount = ledger.accounts.find((account) => account.id === activeAccountId)
   const history = ledger.completedMovements
-    .filter((movement) => movement.accountId === accountId ||
-      movement.counterpartyAccountId === accountId)
+    .filter((movement) => movement.accountId === activeAccountId ||
+      movement.counterpartyAccountId === activeAccountId)
     .sort((left, right) => right.effectiveDate.localeCompare(left.effectiveDate))
 
   function closeDetail() {
@@ -87,7 +94,7 @@ export default function AccountsScreen() {
       navigate: () => router.back(),
     })) return
     if (returnTo === 'movements') router.dismissTo('/movements')
-    else if (create === '1' || returnTo === 'accounts-and-cards') router.dismissTo('/accounts-and-cards')
+    else if (create === '1' || returnTo === 'accounts-and-cards') openInstrumentList()
     else if (accountId) router.back()
     else router.replace('/accounts-and-cards')
   }
@@ -170,12 +177,13 @@ export default function AccountsScreen() {
               ]
               const index = instruments.findIndex((item) => item.id === account.id && item.kind === 'account')
               const target = instruments[index + 1] ?? instruments[index - 1]
+              assertAccountCanBeDeleted(ledger, account.id)
               if (target && selectedAccount?.id === account.id) {
                 setPendingDeletion({ id: account.id, target })
               } else {
                 setLedger(deleteAccount(account.id))
                 setEditing(undefined)
-                if (!target) router.dismissTo('/accounts-and-cards')
+                if (!target) openInstrumentList()
               }
             } catch (caught) {
               Alert.alert(
@@ -491,13 +499,14 @@ export default function AccountsScreen() {
           paddingBottom: 40,
         }}
       >
-        {!!accountId && (
-          <InstrumentCardCarousel ledger={ledger} instrumentId={accountId} kind='account'
+        {!!activeAccountId && (
+          <InstrumentCardCarousel ledger={ledger} instrumentId={activeAccountId} kind='account'
             progress={progress} transitionTo={pendingDeletion?.target} returnTo={returnTo}
             onTransitionEnd={() => {
               if (!pendingDeletion) return
               const { id, target } = pendingDeletion
               try {
+                if (target.kind === 'account') setDisplayedAccountId(target.id)
                 setLedger(deleteAccount(id))
                 setEditing(undefined)
                 setPendingDeletion(null)

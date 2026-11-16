@@ -3,7 +3,7 @@ import { FinanceIcon } from '@/components/ui/FinanceIcon'
 import { BottomSheetTextInput as TextInput } from '@gorhom/bottom-sheet'
 import { useFocusEffect } from '@react-navigation/native'
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   Alert,
   Image,
@@ -24,6 +24,7 @@ import type { Instrument } from '@/components/finance/InstrumentCardCarousel'
 import { InstrumentDetailHeader } from '@/components/finance/InstrumentDetailHeader'
 import { InstrumentDetailMorph } from '@/components/finance/InstrumentDetailMorph'
 import { useInstrumentDetailTransition } from '@/components/finance/InstrumentDetailTransition'
+import { useInstrumentListNavigation } from '@/components/finance/useInstrumentListNavigation'
 import { cutoffForMonth, previousCutoffMonth } from '@/features/finance/billingCalendar'
 import { type CardDesignId, cardDesigns, getCardDesign } from '@/features/finance/cardDesigns'
 import { addDaysKey, addMonthsKey, formatShortDateKey, isDateKey, localDateKey } from '@/features/finance/dates'
@@ -39,6 +40,7 @@ import {
   createCreditCard,
   deleteCardActivity,
   deleteCreditCard,
+  assertCreditCardCanBeDeleted,
   getLedger,
   newCardActivityId,
   newCardId,
@@ -139,7 +141,7 @@ export default function CardsScreen() {
   const router = useRouter()
   const { width: screenWidth } = useWindowDimensions()
   const designPageWidth = screenWidth - 48
-  const { cardId: focusedCardId, create, swipe, fromList, returnTo } = useLocalSearchParams<{
+  const { cardId: routeCardId, create, swipe, fromList, returnTo } = useLocalSearchParams<{
     cardId?: string
     create?: string
     swipe?: string
@@ -147,7 +149,12 @@ export default function CardsScreen() {
     returnTo?: string
   }>()
   const { hasListOrigin, closeToList } = useInstrumentDetailTransition()
+  const openInstrumentList = useInstrumentListNavigation()
   const [ledger, setLedger] = useState(getLedger)
+  const [displayedCardId, setDisplayedCardId] = useState<string | null>(null)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Clear the temporary display override when the route ID changes.
+  useEffect(() => setDisplayedCardId(null), [routeCardId])
+  const focusedCardId = displayedCardId ?? routeCardId
   const [pendingDeletion, setPendingDeletion] = useState<{ id: string; target: Instrument } | null>(null)
   useFocusEffect(
     useCallback(() => {
@@ -216,9 +223,9 @@ export default function CardsScreen() {
       image: getCardDesign(card.cardDesignId)?.image,
       navigate: () => router.back(),
     })) return
-    if (returnTo === 'accounts-and-cards') router.dismissTo('/accounts-and-cards')
+    if (returnTo === 'accounts-and-cards') openInstrumentList()
     else if (focusedCardId || create === '1') router.back()
-    else router.dismissTo('/accounts-and-cards')
+    else openInstrumentList()
   }
 
   function open(
@@ -508,13 +515,14 @@ export default function CardsScreen() {
               ]
               const index = instruments.findIndex((item) => item.id === cardId && item.kind === 'card')
               const target = instruments[index + 1] ?? instruments[index - 1]
+              assertCreditCardCanBeDeleted(ledger, cardId)
               if (target && focusedCardId === cardId) {
                 setPendingDeletion({ id: cardId, target })
               } else {
                 setLedger(deleteCreditCard(cardId))
                 setSelectedCardId('')
                 setSelectedCycleId('')
-                if (!target) router.dismissTo('/accounts-and-cards')
+                if (!target) openInstrumentList()
               }
             } catch (caught) {
               Alert.alert(
@@ -572,6 +580,7 @@ export default function CardsScreen() {
               if (!pendingDeletion) return
               const { id, target } = pendingDeletion
               try {
+                if (target.kind === 'card') setDisplayedCardId(target.id)
                 setLedger(deleteCreditCard(id))
                 setPendingDeletion(null)
                 setSelectedCardId('')
