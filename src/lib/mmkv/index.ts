@@ -1,1 +1,1 @@
-export { clientStorage, zustandMMKVStorage } from './adapters'
+export { zustandMMKVStorage } from './adapters'

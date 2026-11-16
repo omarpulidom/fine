@@ -1,0 +1,443 @@
+import * as Icon from '@/components/ui/PhosphorIcons'
+import { FinanceIcon } from '@/components/ui/FinanceIcon'
+import { useMemo, useState } from 'react'
+import { Pressable, ScrollView, Text, View } from 'react-native'
+import { EmptyState } from '@/components/ui/EmptyState'
+import { formatShortDateKey } from '@/features/finance/dates'
+import { type Ledger, projectedCardPayments } from '@/features/finance/ledger'
+import { formatMoney } from '@/features/finance/money'
+import { cycleForCardPurchase } from '@/features/finance/scheduledCardPurchases'
+import { nextOccurrenceDate, type ScheduledMovement } from '@/features/finance/scheduledMovements'
+
+type Filter = 'all' | 'income' | 'expense' | 'once' | 'weekly' | 'biweekly' | 'monthly' | 'custom'
+type FrequencyFilter = Extract<Filter, 'once' | 'weekly' | 'biweekly' | 'monthly' | 'custom'>
+type ListItem =
+  | {
+      kind: 'movement'
+      date: string
+      movement: ScheduledMovement
+    }
+  | {
+      kind: 'card'
+      date: string
+      amountCents: number
+      cycle: Ledger['cycles'][number]
+    }
+
+type Props = {
+  ledger: Ledger
+  movements: ScheduledMovement[]
+  completedOccurrences: ReadonlySet<string>
+  todayKey: string
+  onEdit: (movement: ScheduledMovement) => void
+  onComplete: (movement: ScheduledMovement) => void
+  onDelete: (movement: ScheduledMovement, occurrenceDate: string) => void
+  onOpenCard: (cardId: string) => void
+  mode?: 'carousel' | 'full'
+  onViewAll?: () => void
+}
+
+const ink = '#101010'
+const muted = '#898989'
+const regular = 'Inter_400Regular'
+const medium = 'Inter_500Medium'
+
+function recurrenceLabel(movement: ScheduledMovement) {
+  if (movement.recurrence === 'weekly') return 'Semanal'
+  if (movement.recurrence === 'biweekly') return 'Quincenal'
+  if (movement.recurrence === 'monthly') return 'Mensual'
+  if (movement.recurrence === 'custom') {
+    const count = movement.recurrenceInterval ?? 1
+    const unit = movement.recurrenceUnit === 'days' ? (count === 1 ? 'día' : 'días')
+      : movement.recurrenceUnit === 'weeks' ? (count === 1 ? 'semana' : 'semanas')
+      : movement.recurrenceUnit === 'years' ? (count === 1 ? 'año' : 'años')
+      : count === 1 ? 'mes' : 'meses'
+    return `Cada ${count} ${unit}`
+  }
+  return null
+}
+
+export function ScheduledMovementsList({
+  ledger,
+  movements,
+  completedOccurrences,
+  todayKey,
+  onEdit,
+  onComplete,
+  onDelete,
+  onOpenCard,
+  mode = 'carousel',
+  onViewAll,
+}: Props) {
+  const [selectedFilters, setSelectedFilters] = useState<Filter[]>(['all'])
+  const items = useMemo<ListItem[]>(() => {
+    const movementItems: ListItem[] = movements.flatMap((movement) => {
+      const date = nextOccurrenceDate(movement, completedOccurrences)
+      return date
+        ? [
+            {
+              kind: 'movement',
+              date,
+              movement,
+            },
+          ]
+        : []
+    })
+    const nextPaymentByCard = new Map<string, ListItem>()
+    for (const payment of projectedCardPayments(
+      ledger, movements, todayKey, 180, completedOccurrences,
+    ).sort((left, right) => left.date.localeCompare(right.date))) {
+      const cycle = ledger.cycles.find((item) => item.id === payment.cycleId)
+      if (cycle && !nextPaymentByCard.has(cycle.cardId)) {
+        nextPaymentByCard.set(cycle.cardId,
+          { kind: 'card', date: payment.date, amountCents: payment.amountCents, cycle })
+      }
+    }
+    const cardItems = [...nextPaymentByCard.values()]
+    return [
+      ...movementItems,
+      ...cardItems,
+    ].sort((a, b) => a.date.localeCompare(b.date))
+  }, [
+    movements,
+    completedOccurrences,
+    ledger,
+    todayKey,
+  ])
+  const selectedTypes = selectedFilters.filter((value): value is 'income' | 'expense' =>
+    value === 'income' || value === 'expense')
+  const selectedFrequencies = selectedFilters.filter((value): value is FrequencyFilter =>
+    value === 'once' || value === 'weekly' || value === 'biweekly' ||
+    value === 'monthly' || value === 'custom')
+  const visibleItems = items.filter((item) => {
+    if (selectedFilters.includes('all')) return true
+    const type = item.kind === 'card' ? 'expense' : item.movement.type
+    const frequency = item.kind === 'card' ? 'monthly' : item.movement.recurrence ?? 'once'
+    return (selectedTypes.length === 0 || (type !== 'transfer' && selectedTypes.includes(type))) &&
+      (selectedFrequencies.length === 0 || selectedFrequencies.includes(frequency))
+  })
+  const filters = [
+    {
+      value: 'all',
+      label: 'Todos',
+    },
+    {
+      value: 'income',
+      label: 'Ingresos',
+    },
+    {
+      value: 'expense',
+      label: 'Gastos',
+    },
+    { value: 'once', label: 'Único' },
+    { value: 'weekly', label: 'Semanal' },
+    { value: 'biweekly', label: 'Quincenal' },
+    { value: 'monthly', label: 'Mensual' },
+    { value: 'custom', label: 'Personalizado' },
+  ] as const
+
+  function toggleFilter(value: Filter) {
+    setSelectedFilters((current) => {
+      if (value === 'all') return ['all']
+      const selected = current.filter((item) => item !== 'all')
+      const next = selected.includes(value)
+        ? selected.filter((item) => item !== value)
+        : [...selected, value]
+      return next.length ? next : ['all']
+    })
+  }
+
+  function details(item: ListItem) {
+    const movement = item.kind === 'movement' ? item.movement : null
+    const cycle = item.kind === 'card' ? item.cycle : null
+    const type = movement?.type ?? 'expense'
+    const title = movement
+      ? movement.description ||
+        (type === 'income' ? 'Ingreso' : type === 'expense' ? 'Gasto' : 'Transferencia')
+      : `Pago de ${ledger.cards.find((card) => card.id === cycle?.cardId)?.name ?? 'tarjeta'}`
+    const amount = movement ? movement.amountCents : item.kind === 'card' ? item.amountCents : 0
+    const accountId = movement?.accountId ??
+      ledger.cards.find((card) => card.id === cycle?.cardId)?.paymentSourceAccountId
+    const accountName = movement?.cardId
+      ? ledger.cards.find((card) => card.id === movement.cardId)?.name
+      : ledger.accounts.find((account) => account.id === accountId)?.name
+    const purchaseCycle = movement?.cardId
+      ? cycleForCardPurchase(ledger, movement.cardId, item.date)
+      : undefined
+    return { movement, cycle, type, title, amount, accountName, purchaseCycle }
+  }
+
+  return (
+    <View>
+      {mode === 'carousel' && (
+        <Text style={{ color: ink, fontFamily: medium, fontSize: 14 }}>
+          Movimientos programados
+        </Text>
+      )}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7,
+        marginTop: 13, marginBottom: 3 }}>
+        {filters.map((option) => (
+          <Pressable
+            key={option.value}
+            onPress={() => toggleFilter(option.value)}
+            accessibilityRole='button'
+            accessibilityState={{
+              selected: selectedFilters.includes(option.value),
+            }}
+            style={{
+              borderRadius: 999,
+              backgroundColor: selectedFilters.includes(option.value) ? ink : '#e8e8e8',
+              paddingHorizontal: 13,
+              paddingVertical: 7,
+            }}
+          >
+            <Text
+              style={{
+                color: selectedFilters.includes(option.value) ? '#fff' : muted,
+                fontFamily: medium,
+                fontSize: 12,
+              }}
+            >
+              {option.label}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+      {visibleItems.length === 0 ? (
+        <View
+          style={{
+            marginTop: 9,
+          }}
+        >
+          <EmptyState
+            message={selectedFilters.includes('all')
+              ? 'Los próximos ingresos y gastos aparecerán aquí.'
+              : 'No hay movimientos con estos filtros.'} compact />
+        </View>
+      ) : mode === 'carousel' ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ gap: 10, paddingTop: 9, paddingBottom: 4 }}
+        >
+          {visibleItems.slice(0, 4).map((item) => {
+            const { movement, cycle, type, title, amount } = details(item)
+            return (
+              <Pressable
+                key={movement ? `movement-${movement.id}` : `card-${cycle?.id}-${item.date}`}
+                onPress={() => {
+                  if (movement) onEdit(movement)
+                  else if (cycle) onOpenCard(cycle.cardId)
+                }}
+                accessibilityRole='button'
+                accessibilityLabel={`${title}, ${formatShortDateKey(item.date)}, ${formatMoney(amount)}`}
+                style={{
+                  width: 188,
+                  height: 150,
+                  borderRadius: 18,
+                  backgroundColor: '#fff',
+                  borderWidth: 1,
+                  borderColor: '#ebebeb',
+                  paddingHorizontal: 15,
+                  paddingVertical: 12,
+                  justifyContent: 'space-between',
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <View style={{ width: 30, height: 30, borderRadius: 15,
+                    backgroundColor: '#f1f1f1', alignItems: 'center', justifyContent: 'center' }}>
+                    <FinanceIcon name={cycle || movement?.cardId ? 'credit-card' : type === 'income' ? 'arrow-down-left'
+                      : type === 'transfer' ? 'repeat' : 'arrow-up-right'} size={15} color={ink} />
+                  </View>
+                  <Text numberOfLines={1}
+                    style={{ flex: 1, color: muted, fontFamily: medium, fontSize: 11 }}>
+                    {movement ? recurrenceLabel(movement) ?? 'Único' : 'Tarjeta'}
+                  </Text>
+                  {movement && (
+                    <Pressable
+                      onPress={(event) => {
+                        event.stopPropagation()
+                        onDelete(movement, item.date)
+                      }}
+                      accessibilityRole='button'
+                      accessibilityLabel={`Eliminar ${title} del ${formatShortDateKey(item.date)}`}
+                      hitSlop={8}
+                      style={{ width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }}
+                    >
+                      <Icon.XIcon size={16} color={muted} />
+                    </Pressable>
+                  )}
+                </View>
+                <Text numberOfLines={2}
+                  style={{ color: ink, fontFamily: medium, fontSize: 15, lineHeight: 20 }}>
+                  {title}
+                </Text>
+                <View>
+                  <Text numberOfLines={1}
+                    style={{ color: muted, fontFamily: regular, fontSize: 11, marginBottom: 3 }}>
+                    {formatShortDateKey(item.date)}
+                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+                    <Text style={{ color: muted, fontFamily: regular, fontSize: 21 }}>
+                      {movement?.cardId ? '' : type === 'income' ? '+' : type === 'transfer' ? '↔' : '−'}
+                    </Text>
+                    <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}
+                      style={{ flex: 1, color: ink, fontFamily: medium, fontSize: 21 }}>
+                      {formatMoney(amount)}
+                    </Text>
+                  </View>
+                </View>
+              </Pressable>
+            )
+          })}
+          <Pressable
+            onPress={onViewAll}
+            accessibilityRole='button'
+            accessibilityLabel='Ver todos los movimientos programados'
+            style={{
+              width: 138,
+              height: 150,
+              borderRadius: 18,
+              backgroundColor: '#fff',
+              borderWidth: 1,
+              borderColor: '#ebebeb',
+              paddingHorizontal: 15,
+              paddingVertical: 12,
+              justifyContent: 'space-between',
+            }}
+          >
+            <View style={{ width: 30, height: 30, borderRadius: 15,
+              backgroundColor: '#f1f1f1', alignItems: 'center', justifyContent: 'center' }}>
+              <Icon.ArrowRightIcon size={16} color={ink} />
+            </View>
+            <View>
+              <Text style={{ color: ink, fontFamily: medium, fontSize: 15 }}>Ver todos</Text>
+              {visibleItems.length > 4 && (
+                <Text style={{ color: muted, fontFamily: regular, fontSize: 11, marginTop: 4 }}>
+                  +{visibleItems.length - 4} más
+                </Text>
+              )}
+            </View>
+          </Pressable>
+        </ScrollView>
+      ) : (
+        visibleItems.map((item, index) => {
+          const { movement, cycle, type, title, amount, accountName, purchaseCycle } = details(item)
+          const startsDateGroup = index === 0 || visibleItems[index - 1].date !== item.date
+          return (
+            <View
+              key={movement ? `movement-${movement.id}` : `card-${cycle?.id}-${item.date}`}
+            >
+              {startsDateGroup && (
+                <Text style={{ color: muted, fontFamily: regular, fontSize: 13,
+                  marginTop: index === 0 ? 18 : 22, marginBottom: 1 }}>
+                  {item.date < todayKey ? `Pendiente desde ${formatShortDateKey(item.date)}`
+                    : formatShortDateKey(item.date)}
+                </Text>
+              )}
+              <View style={{ paddingTop: startsDateGroup ? 5 : 10,
+                paddingBottom: 10, borderBottomWidth: 1,
+                borderBottomColor: '#e6e6e6' }}>
+              <Pressable
+                onPress={() => {
+                  if (movement) onEdit(movement)
+                  else if (cycle) onOpenCard(cycle.cardId)
+                }}
+                accessibilityRole='button'
+                accessibilityLabel={`${title}, ${movement?.cardId ? 'compra con tarjeta' :
+                  type === 'income' ? 'más' : 'menos'} ${formatMoney(amount)}`}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 12,
+                }}
+              >
+                <Text
+                  numberOfLines={2}
+                  style={{
+                    flex: 1,
+                    color: ink,
+                    fontFamily: medium,
+                    fontSize: 15,
+                    lineHeight: 20,
+                  }}
+                >
+                  {title}
+                </Text>
+                <Text
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.75}
+                  style={{
+                    color: ink,
+                    fontFamily: medium,
+                    fontSize: 18,
+                    maxWidth: '48%',
+                  }}
+                >
+                  <Text style={{ fontFamily: regular, color: muted }}>
+                    {movement?.cardId ? '' : type === 'income' ? '+' : type === 'transfer' ? '↔' : '−'}
+                  </Text>
+                  {formatMoney(amount)}
+                </Text>
+              </Pressable>
+              <Text numberOfLines={1} style={{ color: muted, fontFamily: regular,
+                fontSize: 12, marginTop: 4 }}>
+                {[movement ? recurrenceLabel(movement) ?? 'Único' : 'Tarjeta de crédito',
+                  accountName,
+                  purchaseCycle ? `Pago ${formatShortDateKey(purchaseCycle.dueDate)}` : null,
+                ].filter(Boolean).join(' · ')}
+              </Text>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'flex-end',
+                  gap: 20,
+                  marginTop: 7,
+                }}
+              >
+                {movement ? (
+                  <>
+                    <Pressable
+                      onPress={() => onComplete(movement)}
+                      accessibilityRole='button'
+                      accessibilityLabel={`Registrar ${title} como realizado`}
+                      hitSlop={8}
+                    >
+                      <Text style={{ color: ink, fontFamily: medium, fontSize: 12 }}>
+                        Registrar
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => onDelete(movement, item.date)}
+                      accessibilityRole='button'
+                      accessibilityLabel={`Eliminar ${title}`}
+                      hitSlop={8}
+                    >
+                      <Text style={{ color: muted, fontFamily: regular, fontSize: 12 }}>
+                        Eliminar
+                      </Text>
+                    </Pressable>
+                  </>
+                ) : (
+                  <Pressable
+                    onPress={() => cycle && onOpenCard(cycle.cardId)}
+                    accessibilityRole='button'
+                    accessibilityLabel={`Abrir ${title}`}
+                    hitSlop={8}
+                  >
+                    <Text style={{ color: ink, fontFamily: medium, fontSize: 12 }}>
+                      Ver tarjeta
+                    </Text>
+                  </Pressable>
+                )}
+              </View>
+              </View>
+            </View>
+          )
+        })
+      )}
+    </View>
+  )
+}

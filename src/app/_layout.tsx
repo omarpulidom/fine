@@ -1,5 +1,5 @@
 import '../global.css'
-import { useFonts } from '@expo-google-fonts/montserrat'
+import { useFonts } from '@expo-google-fonts/inter'
 import { Stack } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
 import { StatusBar } from 'expo-status-bar'
@@ -7,6 +7,7 @@ import { useEffect } from 'react'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { AppFonts } from '@/components/fonts/fonts'
 import { AppProviders } from '@/components/Providers/AppProviders'
+import { InstrumentDetailTransitionProvider } from '@/components/finance/InstrumentDetailTransition'
 
 SplashScreen.preventAutoHideAsync()
 
@@ -44,9 +45,11 @@ export default function RootLayout() {
         flex: 1,
       }}
     >
-      <StatusBar hidden={true} backgroundColor={'transparent'} />
+      <StatusBar style='dark' backgroundColor='#f6f6f6' />
       <AppProviders>
-        <RootStack />
+        <InstrumentDetailTransitionProvider>
+          <RootStack />
+        </InstrumentDetailTransitionProvider>
       </AppProviders>
     </GestureHandlerRootView>
   )

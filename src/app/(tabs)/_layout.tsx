@@ -1,38 +1,11 @@
-import { Redirect, Tabs } from 'expo-router'
-import { StatusBar } from 'expo-status-bar'
-import { CustomTabBar } from '@/components/Elements/CustomTabBar'
-import { useAuth } from '@/components/Providers/AuthProvider'
+import { Stack } from 'expo-router'
 
 export default function TabsLayout() {
-  const { user } = useAuth()
-
-  if (!user) {
-    return <Redirect href='/(auth)/login' />
-  }
-
   return (
-    <>
-      <StatusBar hidden />
-      <Tabs
-        tabBar={(props) => <CustomTabBar {...props} />}
-        screenOptions={{
-          headerShown: false,
-          animation: 'shift',
-        }}
-      >
-        <Tabs.Screen
-          name='index'
-          options={{
-            title: 'Home',
-          }}
-        />
-        <Tabs.Screen
-          name='profile'
-          options={{
-            title: 'Profile',
-          }}
-        />
-      </Tabs>
-    </>
+    <Stack
+      screenOptions={{
+        headerShown: false,
+      }}
+    />
   )
 }

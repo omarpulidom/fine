@@ -1,19 +1,5 @@
 import type { StateStorage } from 'zustand/middleware'
-import { reactQueryStorage, storageMMKV } from './stores'
-import type { JSONStorage } from './type'
-
-export const clientStorage: JSONStorage = {
-  setItem: (key, value) => {
-    reactQueryStorage.set(key, value)
-  },
-  getItem: (key) => {
-    const value = reactQueryStorage.getString(key)
-    return value === undefined ? null : value
-  },
-  removeItem: (key) => {
-    reactQueryStorage.delete(key)
-  },
-}
+import { storageMMKV } from './stores'
 
 export const zustandMMKVStorage: StateStorage = {
   setItem: (name, value) => {

@@ -1,0 +1,1003 @@
+import { storageMMKV } from '@/lib/mmkv/stores'
+import type { AccountDesignId } from './accountDesigns'
+import type { CardDesignId } from './cardDesigns'
+import { cutoffForMonth, cycleDates, type BillingRule, previousCutoffMonth } from './billingCalendar'
+import { addDaysKey, isDateKey, localDateKey } from './dates'
+import { allocateInstallments, type Installment } from './installments'
+import { cycleForCardPurchase, scheduledCardChargesByCycle } from './scheduledCardPurchases'
+import { getScheduledMovements, moveCardScheduledMovements, type ScheduledMovement } from './scheduledMovements'
+
+const LEDGER_KEY = 'finance:ledger:v1'
+const LEGACY_BALANCE_KEY = 'finance:cash-account-balance-cents:v1'
+
+export type LiquidAccount = {
+  id: string
+  name: string
+  type: 'cash' | 'bank'
+  accountDesignId?: AccountDesignId
+  balanceCents: number
+  asOfDate?: string
+}
+
+export type CompletedMovement = {
+  id: string
+  type: 'income' | 'expense' | 'transfer'
+  accountId: string
+  counterpartyAccountId?: string
+  amountCents: number
+  effectiveDate: string
+  description: string
+  sourceScheduledId?: string
+  sourceOccurrenceDate?: string
+}
+
+export type CreditCard = {
+  id: string
+  name: string
+  cardDesignId?: CardDesignId
+  cutoffDay: number
+  currentDebtCents: number
+  unbilledOpeningCents: number
+  paymentSourceAccountId: string
+  createdDate: string
+  billingRule?: BillingRule
+}
+
+export type BillingCycle = {
+  id: string
+  cardId: string
+  cutoffDate: string
+  dueDate: string
+  openingStatementCents: number
+  scheduledDate?: string
+  scheduledAmountCents: number
+  paidAmountCents: number
+  paymentToAvoidInterestCents?: number
+  minimumPaymentCents?: number
+  automatic?: boolean
+  paymentMode?: 'automatic' | 'manual'
+  dueDateConfirmed?: boolean
+}
+
+export type CardActivity = {
+  id: string
+  type: 'purchase' | 'payment'
+  cardId: string
+  cycleId: string
+  sourceAccountId?: string
+  amountCents: number
+  effectiveDate: string
+  description: string
+  installments?: Installment[]
+  sourceScheduledId?: string
+  sourceOccurrenceDate?: string
+}
+
+export type BalanceReconciliation = {
+  id: string
+  accountId: string
+  date: string
+  deltaCents: number
+}
+
+export type Ledger = {
+  accounts: LiquidAccount[]
+  completedMovements: CompletedMovement[]
+  cards: CreditCard[]
+  cycles: BillingCycle[]
+  cardActivity: CardActivity[]
+  reconciliations: BalanceReconciliation[]
+}
+
+function newId(): string {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
+}
+
+function isAccount(value: unknown): value is LiquidAccount {
+  if (!value || typeof value !== 'object') return false
+  const item = value as Record<string, unknown>
+  return (
+    typeof item.id === 'string' &&
+    typeof item.name === 'string' &&
+    (item.type === 'cash' || item.type === 'bank') &&
+    (item.asOfDate === undefined ||
+      (typeof item.asOfDate === 'string' && isDateKey(item.asOfDate))) &&
+    typeof item.balanceCents === 'number' &&
+    Number.isSafeInteger(item.balanceCents)
+  )
+}
+
+function isCompletedMovement(value: unknown): value is CompletedMovement {
+  if (!value || typeof value !== 'object') return false
+  const item = value as Record<string, unknown>
+  return (
+    typeof item.id === 'string' &&
+    (item.type === 'income' || item.type === 'expense' || item.type === 'transfer') &&
+    typeof item.accountId === 'string' &&
+    (item.counterpartyAccountId === undefined || typeof item.counterpartyAccountId === 'string') &&
+    (item.sourceScheduledId === undefined || typeof item.sourceScheduledId === 'string') &&
+    (item.sourceOccurrenceDate === undefined ||
+      (typeof item.sourceOccurrenceDate === 'string' && isDateKey(item.sourceOccurrenceDate))) &&
+    typeof item.amountCents === 'number' &&
+    Number.isSafeInteger(item.amountCents) &&
+    item.amountCents > 0 &&
+    typeof item.effectiveDate === 'string' &&
+    isDateKey(item.effectiveDate) &&
+    typeof item.description === 'string'
+  )
+}
+
+export function getLedger(): Ledger {
+  const raw = storageMMKV.getString(LEDGER_KEY)
+  if (raw) {
+    try {
+      const parsed: unknown = JSON.parse(raw)
+      if (parsed && typeof parsed === 'object') {
+        const value = parsed as Record<string, unknown>
+        if (Array.isArray(value.accounts) && Array.isArray(value.completedMovements)) {
+          const originalAccounts = value.accounts.filter(isAccount)
+          const accounts = originalAccounts.map((account) => ({
+            ...account,
+            asOfDate: account.asOfDate ?? localDateKey(new Date()),
+          }))
+          const ledger: Ledger = {
+            accounts,
+            completedMovements: value.completedMovements.filter(isCompletedMovement),
+            cards: Array.isArray(value.cards) ? (value.cards as CreditCard[]) : [],
+            cycles: Array.isArray(value.cycles) ? (value.cycles as BillingCycle[]) : [],
+            cardActivity: Array.isArray(value.cardActivity)
+              ? (value.cardActivity as CardActivity[])
+              : [],
+            reconciliations: Array.isArray(value.reconciliations)
+              ? (value.reconciliations as BalanceReconciliation[])
+              : [],
+          }
+          if (originalAccounts.some((account) => !account.asOfDate)) {
+            storageMMKV.set(LEDGER_KEY, JSON.stringify(ledger))
+          }
+          return ensureBillingCalendar(ledger, localDateKey(new Date()))
+        }
+      }
+    } catch {
+      // An unreadable local snapshot is treated as empty.
+    }
+  }
+
+  const legacyBalance = storageMMKV.getNumber(LEGACY_BALANCE_KEY)
+  const ledger: Ledger = {
+    accounts:
+      legacyBalance !== undefined && Number.isSafeInteger(legacyBalance)
+        ? [
+            {
+              id: newId(),
+              name: 'Efectivo y débito',
+              type: 'bank',
+              balanceCents: legacyBalance,
+              asOfDate: localDateKey(new Date()),
+            },
+          ]
+        : [],
+    completedMovements: [],
+    cards: [],
+    cycles: [],
+    cardActivity: [],
+    reconciliations: [],
+  }
+  storageMMKV.set(LEDGER_KEY, JSON.stringify(ledger))
+  return ledger
+}
+
+function persist(ledger: Ledger): Ledger {
+  storageMMKV.set(LEDGER_KEY, JSON.stringify(ledger))
+  return ledger
+}
+
+export function upsertAccount(account: LiquidAccount): Ledger {
+  if (!isAccount(account) || !account.name.trim()) throw new Error('Cuenta inválida')
+  const ledger = getLedger()
+  const index = ledger.accounts.findIndex((item) => item.id === account.id)
+  const accounts = [
+    ...ledger.accounts,
+  ]
+  const previous = index === -1 ? null : accounts[index]
+  if (index === -1) accounts.push(account)
+  else accounts[index] = account
+  return persist({
+    ...ledger,
+    accounts,
+    reconciliations:
+      previous && previous.balanceCents !== account.balanceCents
+        ? [
+            ...ledger.reconciliations,
+            {
+              id: newId(),
+              accountId: account.id,
+              date: localDateKey(new Date()),
+              deltaCents: account.balanceCents - previous.balanceCents,
+            },
+          ]
+        : ledger.reconciliations,
+  })
+}
+
+export function deleteAccount(accountId: string): Ledger {
+  const ledger = getLedger()
+  assertAccountCanBeDeleted(ledger, accountId)
+  return persist({
+    ...ledger,
+    accounts: ledger.accounts.filter((account) => account.id !== accountId),
+    reconciliations: ledger.reconciliations.filter((item) => item.accountId !== accountId),
+  })
+}
+
+export function assertAccountCanBeDeleted(ledger: Ledger, accountId: string): void {
+  if (!ledger.accounts.some((account) => account.id === accountId)) {
+    throw new Error('No se encontró la cuenta.')
+  }
+  if (
+    ledger.completedMovements.some(
+      (movement) =>
+        movement.accountId === accountId || movement.counterpartyAccountId === accountId,
+    )
+  ) {
+    throw new Error('Esta cuenta tiene movimientos realizados. Elimínalos primero.')
+  }
+  if (
+    getScheduledMovements().some(
+      (movement) =>
+        movement.accountId === accountId || movement.counterpartyAccountId === accountId,
+    )
+  ) {
+    throw new Error('Esta cuenta tiene movimientos programados. Elimínalos o cámbialos primero.')
+  }
+  if (ledger.cards.some((card) => card.paymentSourceAccountId === accountId)) {
+    throw new Error(
+      'Una tarjeta usa esta cuenta para pagar. Cambia su cuenta de pago o elimina la tarjeta primero.',
+    )
+  }
+  if (ledger.cardActivity.some((activity) => activity.sourceAccountId === accountId)) {
+    throw new Error('Esta cuenta tiene pagos de tarjeta registrados. Elimínalos primero.')
+  }
+}
+
+export function upsertCompletedMovement(movement: CompletedMovement, todayKey: string): Ledger {
+  if (!isCompletedMovement(movement) || movement.effectiveDate > todayKey) {
+    throw new Error('Movimiento realizado inválido')
+  }
+  const ledger = getLedger()
+  const old = ledger.completedMovements.find((item) => item.id === movement.id)
+  const accounts = ledger.accounts.map((account) => ({
+    ...account,
+  }))
+  const apply = (entry: CompletedMovement, multiplier: number) => {
+    const account = accounts.find((item) => item.id === entry.accountId)
+    if (!account) throw new Error('Selecciona una cuenta existente')
+    if (account.asOfDate && entry.effectiveDate < account.asOfDate) {
+      throw new Error('La fecha es anterior al saldo inicial de la cuenta')
+    }
+    const sign = entry.type === 'income' ? 1 : -1
+    account.balanceCents += sign * entry.amountCents * multiplier
+    if (entry.type === 'transfer') {
+      const target = accounts.find((item) => item.id === entry.counterpartyAccountId)
+      if (!target || target.id === account.id) throw new Error('Elige otra cuenta de destino')
+      if (target.asOfDate && entry.effectiveDate < target.asOfDate) {
+        throw new Error('La fecha es anterior al saldo inicial de la cuenta de destino')
+      }
+      target.balanceCents += entry.amountCents * multiplier
+      if (!Number.isSafeInteger(target.balanceCents)) throw new Error('Saldo fuera de rango')
+    }
+    if (!Number.isSafeInteger(account.balanceCents)) throw new Error('Saldo fuera de rango')
+  }
+  if (old) apply(old, -1)
+  apply(movement, 1)
+  const completedMovements = old
+    ? ledger.completedMovements.map((item) => (item.id === movement.id ? movement : item))
+    : [
+        ...ledger.completedMovements,
+        movement,
+      ]
+  return persist({
+    ...ledger,
+    accounts,
+    completedMovements,
+  })
+}
+
+export function deleteCompletedMovement(id: string): Ledger {
+  const ledger = getLedger()
+  const old = ledger.completedMovements.find((item) => item.id === id)
+  if (!old) return ledger
+  const accounts = ledger.accounts.map((account) => ({
+    ...account,
+  }))
+  const account = accounts.find((item) => item.id === old.accountId)
+  if (!account) throw new Error('No se encontró la cuenta')
+  account.balanceCents += old.type === 'income' ? -old.amountCents : old.amountCents
+  if (old.type === 'transfer') {
+    const target = accounts.find((item) => item.id === old.counterpartyAccountId)
+    if (!target) throw new Error('No se encontró la cuenta de destino')
+    target.balanceCents -= old.amountCents
+  }
+  return persist({
+    ...ledger,
+    accounts,
+    completedMovements: ledger.completedMovements.filter((item) => item.id !== id),
+  })
+}
+
+export function newAccountId(): string {
+  return newId()
+}
+export function newMovementId(): string {
+  return newId()
+}
+export function totalLiquidity(ledger: Ledger): number {
+  return ledger.accounts.reduce((total, account) => total + account.balanceCents, 0)
+}
+
+export function newCardId(): string {
+  return newId()
+}
+export function newCycleId(): string {
+  return newId()
+}
+export function newCardActivityId(): string {
+  return newId()
+}
+
+export function statementAmountCents(ledger: Ledger, cycleId: string): number {
+  const cycle = ledger.cycles.find((item) => item.id === cycleId)
+  if (!cycle) return 0
+  return (
+    cycle.openingStatementCents +
+    ledger.cardActivity
+      .filter((item) => item.type === 'purchase')
+      .reduce(
+        (total, item) =>
+          total +
+          (item.installments
+            ? (item.installments.find((part) => part.cycleId === cycleId)?.amountCents ?? 0)
+            : item.cycleId === cycleId
+              ? item.amountCents
+              : 0),
+        0,
+      )
+  )
+}
+
+function automaticCycles(ledger: Ledger, card: CreditCard, today: string): BillingCycle[] {
+  if (!card.billingRule) return []
+  const existingMonths = new Set(
+    ledger.cycles.filter((cycle) => cycle.cardId === card.id).map((cycle) => cycle.cutoffDate.slice(0, 7)),
+  )
+  const anchorMonth = card.billingRule.anchorCutoffMonth
+  const todayMonth = today.slice(0, 7)
+  const yearDiff = Number(todayMonth.slice(0, 4)) - Number(anchorMonth.slice(0, 4))
+  const monthDiff = Number(todayMonth.slice(5, 7)) - Number(anchorMonth.slice(5, 7))
+  const start = Math.max(0, yearDiff * 12 + monthDiff - 1)
+  const result: BillingCycle[] = []
+  for (let offset = start; offset < start + 48; offset++) {
+    const dates = cycleDates(card.billingRule, card.cutoffDay, offset)
+    const month = dates.cutoffDate.slice(0, 7)
+    if (existingMonths.has(month) || dates.dueDate <= dates.cutoffDate) continue
+    result.push({
+      id: `auto:${card.id}:${month}`,
+      cardId: card.id,
+      ...dates,
+      openingStatementCents: 0,
+      scheduledAmountCents: 0,
+      paidAmountCents: 0,
+      automatic: true,
+      paymentMode: 'automatic',
+      dueDateConfirmed: false,
+    })
+    existingMonths.add(month)
+  }
+  return result
+}
+
+export function ensureBillingCalendar(ledger: Ledger, today: string): Ledger {
+  const cycles = [...ledger.cycles]
+  for (const card of ledger.cards) {
+    cycles.push(...automaticCycles({ ...ledger, cycles }, card, today))
+  }
+  return cycles.length === ledger.cycles.length ? ledger : persist({ ...ledger, cycles })
+}
+
+export function completedScheduledOccurrenceKeys(ledger: Ledger): string[] {
+  return [...ledger.completedMovements, ...ledger.cardActivity]
+    .filter((item) => item.sourceScheduledId && item.sourceOccurrenceDate)
+    .map((item) => `${item.sourceScheduledId}:${item.sourceOccurrenceDate}`)
+}
+
+export function projectedCardPayments(
+  ledger: Ledger,
+  movements: readonly ScheduledMovement[] = [],
+  todayKey = localDateKey(new Date()),
+  horizonDays = 180,
+  completedOccurrences: ReadonlySet<string> = new Set(),
+): { date: string; amountCents: number; cycleId: string }[] {
+  const futureCharges = scheduledCardChargesByCycle(
+    ledger, movements, addDaysKey(todayKey, horizonDays), completedOccurrences,
+  )
+  const payments = ledger.cycles.flatMap((cycle) => {
+    const automatic = cycle.paymentMode === 'automatic'
+    const future = futureCharges.get(cycle.id) ?? 0
+    if (automatic) {
+      const amountCents = Math.max(0,
+        statementAmountCents(ledger, cycle.id) + future - cycle.paidAmountCents)
+      return amountCents > 0
+        ? [{ date: cycle.dueDate, amountCents, cycleId: cycle.id }]
+        : []
+    }
+    const actualScheduled = ledger.cardActivity
+      .filter((activity) => activity.type === 'purchase' &&
+        activity.cycleId === cycle.id && activity.sourceScheduledId)
+      .reduce((total, activity) => total + activity.amountCents, 0)
+    const manualAmount = Math.max(0, cycle.scheduledAmountCents - cycle.paidAmountCents)
+    const uncoveredScheduledPurchases = Math.max(0,
+      actualScheduled - cycle.scheduledAmountCents)
+    const scheduledAmount = Math.max(0, future + uncoveredScheduledPurchases -
+      Math.max(0, cycle.paidAmountCents - cycle.scheduledAmountCents))
+    return [
+      ...(cycle.scheduledDate && manualAmount > 0
+        ? [{ date: cycle.scheduledDate, amountCents: manualAmount, cycleId: cycle.id }]
+        : []),
+      ...(scheduledAmount > 0
+        ? [{ date: cycle.dueDate, amountCents: scheduledAmount, cycleId: cycle.id }]
+        : []),
+    ]
+  })
+  const combined = new Map<string, (typeof payments)[number]>()
+  for (const payment of payments) {
+    const key = `${payment.cycleId}:${payment.date}`
+    const previous = combined.get(key)
+    combined.set(key, previous
+      ? { ...previous, amountCents: previous.amountCents + payment.amountCents }
+      : payment)
+  }
+  return [...combined.values()]
+}
+
+export function activateAutomaticBilling(cardId: string, nextDueDate: string): Ledger {
+  const ledger = getLedger()
+  const card = ledger.cards.find((item) => item.id === cardId)
+  if (!card || card.billingRule || !isDateKey(nextDueDate) || nextDueDate <= localDateKey(new Date())) {
+    throw new Error('Selecciona una fecha límite futura válida.')
+  }
+  const billingRule = {
+    anchorCutoffMonth: previousCutoffMonth(nextDueDate, card.cutoffDay),
+    anchorDueDate: nextDueDate,
+  }
+  const updated = {
+    ...ledger,
+    cards: ledger.cards.map((item) => item.id === cardId ? { ...item, billingRule } : item),
+  }
+  return ensureBillingCalendar(persist(updated), localDateKey(new Date()))
+}
+
+export function confirmCycleStatement(
+  cycleId: string,
+  openingCents: number,
+  dueDate: string,
+): Ledger {
+  const ledger = getLedger()
+  const cycle = ledger.cycles.find((item) => item.id === cycleId)
+  const card = ledger.cards.find((item) => item.id === cycle?.cardId)
+  if (!cycle || !card || !cycle.automatic || !Number.isSafeInteger(openingCents) ||
+      openingCents < 0 ||
+      !isDateKey(dueDate) || dueDate <= cycle.cutoffDate) {
+    throw new Error('Revisa el saldo pendiente y la fecha límite.')
+  }
+  const delta = openingCents - cycle.openingStatementCents
+  if (delta > card.unbilledOpeningCents || delta < -cycle.openingStatementCents) {
+    throw new Error('Saldo pendiente inválido.')
+  }
+  if (statementAmountCents(ledger, cycleId) + delta < cycle.paidAmountCents) {
+    throw new Error('El saldo confirmado no puede ser menor que los pagos realizados.')
+  }
+  return persist({
+    ...ledger,
+    cards: ledger.cards.map((item) => item.id === card.id
+      ? { ...item, unbilledOpeningCents: item.unbilledOpeningCents - delta }
+      : item),
+    cycles: ledger.cycles.map((item) => item.id === cycleId
+      ? { ...item, openingStatementCents: openingCents, dueDate, dueDateConfirmed: true,
+          paymentMode: 'automatic' as const }
+      : item),
+  })
+}
+
+export function createCreditCard(card: CreditCard, initialCycle: BillingCycle | null): Ledger {
+  const ledger = getLedger()
+  if (
+    !card.name.trim() ||
+    !isDateKey(card.createdDate) ||
+    card.cutoffDay < 1 ||
+    card.cutoffDay > 31 ||
+    !ledger.accounts.some((account) => account.id === card.paymentSourceAccountId) ||
+    !Number.isSafeInteger(card.currentDebtCents) ||
+    card.currentDebtCents < 0 ||
+    !Number.isSafeInteger(card.unbilledOpeningCents) ||
+    card.unbilledOpeningCents < 0 ||
+    ledger.cards.some((item) => item.id === card.id)
+  )
+    throw new Error('Tarjeta inválida')
+  if (
+    initialCycle &&
+    (initialCycle.cardId !== card.id ||
+      initialCycle.openingStatementCents > card.currentDebtCents ||
+      !isDateKey(initialCycle.cutoffDate) ||
+      !isDateKey(initialCycle.dueDate) ||
+      initialCycle.dueDate <= initialCycle.cutoffDate)
+  )
+    throw new Error('Ciclo inicial inválido')
+  return ensureBillingCalendar(persist({
+    ...ledger,
+    cards: [
+      ...ledger.cards,
+      card,
+    ],
+    cycles: initialCycle
+      ? [
+          ...ledger.cycles,
+          initialCycle,
+        ]
+      : ledger.cycles,
+  }), localDateKey(new Date()))
+}
+
+export function deleteCreditCard(cardId: string): Ledger {
+  const ledger = getLedger()
+  assertCreditCardCanBeDeleted(ledger, cardId)
+  const cycleIds = new Set(
+    ledger.cycles.filter((cycle) => cycle.cardId === cardId).map((cycle) => cycle.id),
+  )
+  return persist({
+    ...ledger,
+    cards: ledger.cards.filter((card) => card.id !== cardId),
+    cycles: ledger.cycles.filter((cycle) => !cycleIds.has(cycle.id)),
+  })
+}
+
+export type CardRemovalTarget = { cardId: string } | { accountId: string } | null
+
+export function removeCreditCardWithAssociations(cardId: string, target: CardRemovalTarget): Ledger {
+  const ledger = getLedger()
+  const card = ledger.cards.find((item) => item.id === cardId)
+  if (!card) throw new Error('No se encontró la tarjeta.')
+  const targetCard = target && 'cardId' in target
+    ? ledger.cards.find((item) => item.id === target.cardId && item.id !== cardId) : undefined
+  const targetAccount = target && 'accountId' in target
+    ? ledger.accounts.find((item) => item.id === target.accountId) : undefined
+  if (target && !targetCard && !targetAccount) throw new Error('Selecciona otro instrumento válido.')
+  const scheduledPurchases = getScheduledMovements().filter((item) => item.cardId === cardId)
+  if (targetCard && scheduledPurchases.some((item) =>
+    !cycleForCardPurchase(ledger, targetCard.id, item.effectiveDate) ||
+    (item.recurrence && !targetCard.billingRule))) {
+    throw new Error('La tarjeta de destino no tiene ciclos para todas las compras programadas.')
+  }
+  const cycleIds = new Set(ledger.cycles.filter((cycle) => cycle.cardId === cardId).map((cycle) => cycle.id))
+  const activity = ledger.cardActivity.filter((item) => item.cardId === cardId || cycleIds.has(item.cycleId))
+  const payments = activity.filter((item) => item.type === 'payment')
+  const purchases = activity.filter((item) => item.type === 'purchase')
+  const accounts = ledger.accounts.map((item) => ({ ...item }))
+  const completedMovements = [...ledger.completedMovements]
+  if (!targetCard) {
+    for (const payment of payments) {
+      const source = accounts.find((item) => item.id === payment.sourceAccountId)
+      if (!source) throw new Error('No se encontró la cuenta de un pago registrado.')
+      source.balanceCents += payment.amountCents
+    }
+    if (targetAccount) {
+      const account = accounts.find((item) => item.id === targetAccount.id)
+      if (!account) throw new Error('No se encontró la cuenta de destino.')
+      const openingDebt = card.currentDebtCents +
+        payments.reduce((sum, item) => sum + item.amountCents, 0) -
+        purchases.reduce((sum, item) => sum + item.amountCents, 0)
+      if (openingDebt < 0) throw new Error('La deuda inicial no se puede conciliar.')
+      const charges = [
+        ...purchases.map((item) => ({ amountCents: item.amountCents,
+          effectiveDate: item.effectiveDate, description: item.description,
+          sourceScheduledId: item.sourceScheduledId,
+          sourceOccurrenceDate: item.sourceOccurrenceDate })),
+        ...(openingDebt ? [{ amountCents: openingDebt, effectiveDate: card.createdDate,
+          description: `Deuda inicial de ${card.name}` }] : []),
+      ]
+      for (const charge of charges) {
+        account.balanceCents -= charge.amountCents
+        completedMovements.push({ id: newMovementId(), type: 'expense', accountId: account.id,
+          ...charge, effectiveDate: charge.effectiveDate < (account.asOfDate ?? '')
+            ? localDateKey(new Date()) : charge.effectiveDate })
+      }
+    }
+  }
+  if (accounts.some((item) => !Number.isSafeInteger(item.balanceCents))) {
+    throw new Error('El saldo resultante está fuera de rango.')
+  }
+  if (targetCard && (!Number.isSafeInteger(targetCard.currentDebtCents + card.currentDebtCents) ||
+    !Number.isSafeInteger(targetCard.unbilledOpeningCents + card.unbilledOpeningCents))) {
+    throw new Error('La deuda resultante está fuera de rango.')
+  }
+  const next = {
+    ...ledger,
+    accounts,
+    completedMovements,
+    cards: ledger.cards.filter((item) => item.id !== cardId).map((item) =>
+      item.id === targetCard?.id ? { ...item,
+        currentDebtCents: item.currentDebtCents + card.currentDebtCents,
+        unbilledOpeningCents: item.unbilledOpeningCents + card.unbilledOpeningCents } : item),
+    cycles: ledger.cycles.flatMap((cycle) => cycle.cardId !== cardId ? [cycle] :
+      targetCard ? [{ ...cycle, cardId: targetCard.id }] : []),
+    cardActivity: ledger.cardActivity.flatMap((item) => item.cardId !== cardId ? [item] :
+      targetCard ? [{ ...item, cardId: targetCard.id }] : []),
+  }
+  moveCardScheduledMovements(cardId, target)
+  return persist(next)
+}
+
+export function assertCreditCardCanBeDeleted(ledger: Ledger, cardId: string): void {
+  if (!ledger.cards.some((card) => card.id === cardId)) {
+    throw new Error('No se encontró la tarjeta.')
+  }
+  if (getScheduledMovements().some((movement) => movement.cardId === cardId)) {
+    throw new Error('Esta tarjeta tiene compras programadas. Elimínalas o cámbialas primero.')
+  }
+  const cycleIds = new Set(
+    ledger.cycles.filter((cycle) => cycle.cardId === cardId).map((cycle) => cycle.id),
+  )
+  if (
+    ledger.cardActivity.some(
+      (activity) =>
+        activity.cardId === cardId ||
+        cycleIds.has(activity.cycleId) ||
+        activity.installments?.some((part) => cycleIds.has(part.cycleId)),
+    )
+  ) {
+    throw new Error('Esta tarjeta tiene compras o pagos registrados. Elimínalos primero.')
+  }
+}
+
+export function updateCreditCardSettings(
+  cardId: string,
+  name: string,
+  cutoffDay: number,
+  paymentSourceAccountId: string,
+): Ledger {
+  const ledger = getLedger()
+  if (
+    !ledger.cards.some((card) => card.id === cardId) ||
+    !name.trim() ||
+    !Number.isInteger(cutoffDay) ||
+    cutoffDay < 1 ||
+    cutoffDay > 31 ||
+    !ledger.accounts.some((account) => account.id === paymentSourceAccountId)
+  ) {
+    throw new Error('Configuración de tarjeta inválida')
+  }
+  return persist({
+    ...ledger,
+    cards: ledger.cards.map((card) =>
+      card.id === cardId
+        ? {
+            ...card,
+            name: name.trim(),
+            cutoffDay,
+            paymentSourceAccountId,
+          }
+        : card,
+    ),
+    cycles: ledger.cycles.map((cycle) => {
+      if (cycle.cardId !== cardId || !cycle.automatic || cycle.dueDateConfirmed ||
+          cycle.openingStatementCents > 0 || cycle.paidAmountCents > 0 ||
+          ledger.cardActivity.some((item) => item.cycleId === cycle.id ||
+            item.installments?.some((part) => part.cycleId === cycle.id))) return cycle
+      const nextCutoff = cutoffForMonth(cycle.cutoffDate.slice(0, 7), cutoffDay)
+      return nextCutoff < cycle.dueDate ? { ...cycle, cutoffDate: nextCutoff } : cycle
+    }),
+  })
+}
+
+export function createBillingCycle(cycle: BillingCycle): Ledger {
+  const ledger = getLedger()
+  const card = ledger.cards.find((item) => item.id === cycle.cardId)
+  if (
+    !card ||
+    !Number.isSafeInteger(cycle.openingStatementCents) ||
+    cycle.openingStatementCents < 0 ||
+    cycle.openingStatementCents > card.unbilledOpeningCents ||
+    !isDateKey(cycle.cutoffDate) ||
+    !isDateKey(cycle.dueDate) ||
+    cycle.dueDate <= cycle.cutoffDate ||
+    ledger.cycles.some(
+      (item) =>
+        item.id === cycle.id ||
+        (item.cardId === cycle.cardId && item.cutoffDate === cycle.cutoffDate),
+    )
+  ) {
+    throw new Error('Ciclo inválido')
+  }
+  return persist({
+    ...ledger,
+    cards: ledger.cards.map((item) =>
+      item.id === card.id
+        ? {
+            ...item,
+            unbilledOpeningCents: item.unbilledOpeningCents - cycle.openingStatementCents,
+          }
+        : item,
+    ),
+    cycles: [
+      ...ledger.cycles,
+      cycle,
+    ],
+  })
+}
+
+export function scheduleCyclePayment(
+  cycleId: string,
+  scheduledDate: string | undefined,
+  scheduledAmountCents: number,
+  dueDate?: string,
+): Ledger {
+  const ledger = getLedger()
+  const cycle = ledger.cycles.find((item) => item.id === cycleId)
+  if (
+    !cycle ||
+    (scheduledDate && !isDateKey(scheduledDate)) ||
+    (dueDate && (!isDateKey(dueDate) || dueDate <= cycle.cutoffDate)) ||
+    !Number.isSafeInteger(scheduledAmountCents) ||
+    scheduledAmountCents < 0 ||
+    scheduledAmountCents > statementAmountCents(ledger, cycleId)
+  ) {
+    throw new Error('Pago programado inválido')
+  }
+  return persist({
+    ...ledger,
+    cycles: ledger.cycles.map((item) =>
+      item.id === cycleId
+        ? {
+            ...item,
+            dueDate: dueDate ?? item.dueDate,
+            scheduledDate,
+            scheduledAmountCents,
+            paymentMode: 'manual',
+            dueDateConfirmed: true,
+          }
+        : item,
+    ),
+  })
+}
+
+export function addCardActivity(activity: CardActivity, todayKey: string): Ledger {
+  const ledger = getLedger()
+  const card = ledger.cards.find((item) => item.id === activity.cardId)
+  const cycle = ledger.cycles.find(
+    (item) => item.id === activity.cycleId && item.cardId === activity.cardId,
+  )
+  if (
+    !card ||
+    !cycle ||
+    !isDateKey(activity.effectiveDate) ||
+    activity.effectiveDate > todayKey ||
+    !Number.isSafeInteger(activity.amountCents) ||
+    activity.amountCents <= 0 ||
+    activity.effectiveDate < card.createdDate ||
+    (activity.sourceScheduledId && (!activity.sourceOccurrenceDate ||
+      !isDateKey(activity.sourceOccurrenceDate))) ||
+    (activity.sourceOccurrenceDate && !activity.sourceScheduledId) ||
+    (activity.sourceScheduledId && ledger.cardActivity.some((item) =>
+      item.sourceScheduledId === activity.sourceScheduledId &&
+      item.sourceOccurrenceDate === activity.sourceOccurrenceDate)) ||
+    ledger.cardActivity.some((item) => item.id === activity.id)
+  )
+    throw new Error('Actividad inválida')
+
+  const accounts = ledger.accounts.map((item) => ({
+    ...item,
+  }))
+  const cards = ledger.cards.map((item) => ({
+    ...item,
+  }))
+  const cycles = ledger.cycles.map((item) => ({
+    ...item,
+  }))
+  const targetCard = cards.find((item) => item.id === card.id)
+  const targetCycle = cycles.find((item) => item.id === cycle.id)
+  if (!targetCard || !targetCycle) throw new Error('No se encontró la tarjeta o el ciclo')
+  if (activity.type === 'purchase') {
+    if (activity.installments) {
+      const parts = activity.installments
+      if (
+        parts.length < 2 ||
+        new Set(parts.map((part) => part.cycleId)).size !== parts.length ||
+        parts.reduce((total, part) => total + part.amountCents, 0) !== activity.amountCents ||
+        parts.some(
+          (part) =>
+            part.amountCents <= 0 ||
+            !ledger.cycles.some((item) => item.id === part.cycleId && item.cardId === card.id),
+        )
+      ) {
+        throw new Error('Plan MSI inválido')
+      }
+    }
+    targetCard.currentDebtCents += activity.amountCents
+  } else {
+    const source = accounts.find((item) => item.id === activity.sourceAccountId)
+    const unpaidStatement = statementAmountCents(ledger, cycle.id) - cycle.paidAmountCents
+    if (
+      !source ||
+      activity.amountCents > targetCard.currentDebtCents ||
+      activity.amountCents > unpaidStatement
+    )
+      throw new Error('Pago mayor que la deuda pendiente')
+    source.balanceCents -= activity.amountCents
+    targetCard.currentDebtCents -= activity.amountCents
+    targetCycle.paidAmountCents += activity.amountCents
+  }
+  if (!Number.isSafeInteger(targetCard.currentDebtCents)) throw new Error('Deuda fuera de rango')
+  return persist({
+    ...ledger,
+    accounts,
+    cards,
+    cycles,
+    cardActivity: [
+      ...ledger.cardActivity,
+      activity,
+    ],
+  })
+}
+
+export function completeScheduledCardPurchase(
+  movement: ScheduledMovement,
+  occurrenceDate: string,
+  todayKey: string,
+): Ledger {
+  if (!movement.cardId || movement.type !== 'expense') {
+    throw new Error('Selecciona una compra programada con tarjeta.')
+  }
+  const ledger = getLedger()
+  const cycle = cycleForCardPurchase(ledger, movement.cardId, todayKey)
+  if (!cycle) throw new Error('La tarjeta no tiene un ciclo de pago para esta compra.')
+  return addCardActivity({
+    id: newCardActivityId(),
+    type: 'purchase',
+    cardId: movement.cardId,
+    cycleId: cycle.id,
+    amountCents: movement.amountCents,
+    effectiveDate: todayKey,
+    description: movement.description,
+    sourceScheduledId: movement.id,
+    sourceOccurrenceDate: occurrenceDate,
+  }, todayKey)
+}
+
+export function deleteCardActivity(id: string): Ledger {
+  const ledger = getLedger()
+  const activity = ledger.cardActivity.find((item) => item.id === id)
+  if (!activity) return ledger
+  const accounts = ledger.accounts.map((item) => ({
+    ...item,
+  }))
+  const cards = ledger.cards.map((item) => ({
+    ...item,
+  }))
+  const cycles = ledger.cycles.map((item) => ({
+    ...item,
+  }))
+  const card = cards.find((item) => item.id === activity.cardId)
+  const cycle = cycles.find((item) => item.id === activity.cycleId)
+  if (!card || !cycle) throw new Error('No se encontró la tarjeta o el ciclo')
+  if (activity.type === 'purchase') {
+    const portions = activity.installments ?? [
+      {
+        cycleId: activity.cycleId,
+        amountCents: activity.amountCents,
+      },
+    ]
+    if (
+      card.currentDebtCents < activity.amountCents ||
+      portions.some((part) => {
+        const linkedCycle = cycles.find((item) => item.id === part.cycleId)
+        return (
+          !linkedCycle ||
+          statementAmountCents(ledger, part.cycleId) - part.amountCents <
+            linkedCycle.paidAmountCents ||
+          statementAmountCents(ledger, part.cycleId) - part.amountCents <
+            linkedCycle.scheduledAmountCents
+        )
+      })
+    )
+      throw new Error('No puedes borrar una compra que ya fue pagada')
+    card.currentDebtCents -= activity.amountCents
+  } else {
+    const source = accounts.find((item) => item.id === activity.sourceAccountId)
+    if (!source) throw new Error('No se encontró la cuenta de pago')
+    source.balanceCents += activity.amountCents
+    card.currentDebtCents += activity.amountCents
+    cycle.paidAmountCents -= activity.amountCents
+  }
+  return persist({
+    ...ledger,
+    accounts,
+    cards,
+    cycles,
+    cardActivity: ledger.cardActivity.filter((item) => item.id !== id),
+  })
+}
+
+export function reassignPurchase(id: string, targetCycleId: string): Ledger {
+  const ledger = getLedger()
+  const purchase = ledger.cardActivity.find((item) => item.id === id && item.type === 'purchase')
+  const target = ledger.cycles.find(
+    (item) => item.id === targetCycleId && item.cardId === purchase?.cardId,
+  )
+  const origin = ledger.cycles.find((item) => item.id === purchase?.cycleId)
+  if (
+    !purchase ||
+    purchase.installments ||
+    !target ||
+    !origin ||
+    statementAmountCents(ledger, origin.id) - purchase.amountCents < origin.paidAmountCents ||
+    statementAmountCents(ledger, origin.id) - purchase.amountCents < origin.scheduledAmountCents
+  ) {
+    throw new Error('No se puede reasignar esta compra')
+  }
+  return persist({
+    ...ledger,
+    cardActivity: ledger.cardActivity.map((item) =>
+      item.id === id
+        ? {
+            ...item,
+            cycleId: targetCycleId,
+          }
+        : item,
+    ),
+  })
+}
+
+export function reassignInstallmentPurchase(
+  id: string,
+  firstCycleId: string,
+  months: number,
+): Ledger {
+  const ledger = getLedger()
+  const purchase = ledger.cardActivity.find(
+    (item) => item.id === id && item.type === 'purchase' && item.installments,
+  )
+  if (!purchase?.installments) throw new Error('No se encontró el plan MSI')
+  const nextParts = allocateInstallments(
+    ledger.cycles,
+    purchase.cardId,
+    firstCycleId,
+    months,
+    purchase.amountCents,
+  )
+  const affectedIds = new Set([
+    ...purchase.installments.map((part) => part.cycleId),
+    ...nextParts.map((part) => part.cycleId),
+  ])
+  for (const cycleId of affectedIds) {
+    const cycle = ledger.cycles.find((item) => item.id === cycleId)
+    if (!cycle) throw new Error('Ciclo faltante')
+    const oldShare =
+      purchase.installments.find((part) => part.cycleId === cycleId)?.amountCents ?? 0
+    const newShare = nextParts.find((part) => part.cycleId === cycleId)?.amountCents ?? 0
+    const nextStatement = statementAmountCents(ledger, cycleId) - oldShare + newShare
+    if (nextStatement < cycle.paidAmountCents || nextStatement < cycle.scheduledAmountCents) {
+      throw new Error('Corrige los pagos vinculados antes de cambiar este plan MSI')
+    }
+  }
+  return persist({
+    ...ledger,
+    cardActivity: ledger.cardActivity.map((item) =>
+      item.id === id
+        ? {
+            ...item,
+            cycleId: firstCycleId,
+            installments: nextParts,
+          }
+        : item,
+    ),
+  })
+}
