@@ -75,14 +75,17 @@ export function ScheduledMovementsList({
           ]
         : []
     })
-    const cardItems: ListItem[] = projectedCardPayments(
+    const nextPaymentByCard = new Map<string, ListItem>()
+    for (const payment of projectedCardPayments(
       ledger, movements, todayKey, 180, completedOccurrences,
-    ).flatMap((payment) => {
+    ).sort((left, right) => left.date.localeCompare(right.date))) {
       const cycle = ledger.cycles.find((item) => item.id === payment.cycleId)
-      return cycle
-        ? [{ kind: 'card', date: payment.date, amountCents: payment.amountCents, cycle }]
-        : []
-    })
+      if (cycle && !nextPaymentByCard.has(cycle.cardId)) {
+        nextPaymentByCard.set(cycle.cardId,
+          { kind: 'card', date: payment.date, amountCents: payment.amountCents, cycle })
+      }
+    }
+    const cardItems = [...nextPaymentByCard.values()]
     return [
       ...movementItems,
       ...cardItems,
