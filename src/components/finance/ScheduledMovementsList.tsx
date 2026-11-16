@@ -9,8 +9,8 @@ import { formatMoney } from '@/features/finance/money'
 import { cycleForCardPurchase } from '@/features/finance/scheduledCardPurchases'
 import { nextOccurrenceDate, type ScheduledMovement } from '@/features/finance/scheduledMovements'
 
-type Filter = 'all' | 'income' | 'expense' | 'once' | 'weekly' | 'biweekly' | 'monthly'
-type FrequencyFilter = Extract<Filter, 'once' | 'weekly' | 'biweekly' | 'monthly'>
+type Filter = 'all' | 'income' | 'expense' | 'once' | 'weekly' | 'biweekly' | 'monthly' | 'custom'
+type FrequencyFilter = Extract<Filter, 'once' | 'weekly' | 'biweekly' | 'monthly' | 'custom'>
 type ListItem =
   | {
       kind: 'movement'
@@ -46,6 +46,14 @@ function recurrenceLabel(movement: ScheduledMovement) {
   if (movement.recurrence === 'weekly') return 'Semanal'
   if (movement.recurrence === 'biweekly') return 'Quincenal'
   if (movement.recurrence === 'monthly') return 'Mensual'
+  if (movement.recurrence === 'custom') {
+    const count = movement.recurrenceInterval ?? 1
+    const unit = movement.recurrenceUnit === 'days' ? (count === 1 ? 'día' : 'días')
+      : movement.recurrenceUnit === 'weeks' ? (count === 1 ? 'semana' : 'semanas')
+      : movement.recurrenceUnit === 'years' ? (count === 1 ? 'año' : 'años')
+      : count === 1 ? 'mes' : 'meses'
+    return `Cada ${count} ${unit}`
+  }
   return null
 }
 
@@ -99,7 +107,8 @@ export function ScheduledMovementsList({
   const selectedTypes = selectedFilters.filter((value): value is 'income' | 'expense' =>
     value === 'income' || value === 'expense')
   const selectedFrequencies = selectedFilters.filter((value): value is FrequencyFilter =>
-    value === 'once' || value === 'weekly' || value === 'biweekly' || value === 'monthly')
+    value === 'once' || value === 'weekly' || value === 'biweekly' ||
+    value === 'monthly' || value === 'custom')
   const visibleItems = items.filter((item) => {
     if (selectedFilters.includes('all')) return true
     const type = item.kind === 'card' ? 'expense' : item.movement.type
@@ -124,6 +133,7 @@ export function ScheduledMovementsList({
     { value: 'weekly', label: 'Semanal' },
     { value: 'biweekly', label: 'Quincenal' },
     { value: 'monthly', label: 'Mensual' },
+    { value: 'custom', label: 'Personalizado' },
   ] as const
 
   function toggleFilter(value: Filter) {

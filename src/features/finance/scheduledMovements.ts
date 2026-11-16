@@ -11,7 +11,9 @@ export type ScheduledMovement = {
   accountId?: string
   cardId?: string
   counterpartyAccountId?: string
-  recurrence?: 'weekly' | 'biweekly' | 'monthly'
+  recurrence?: 'weekly' | 'biweekly' | 'monthly' | 'custom'
+  recurrenceInterval?: number
+  recurrenceUnit?: 'days' | 'weeks' | 'months' | 'years'
   endDate?: string
   effectiveDate: string
   description: string
@@ -35,7 +37,14 @@ function isScheduledMovement(value: unknown): value is ScheduledMovement {
     (item.recurrence === undefined ||
       item.recurrence === 'weekly' ||
       item.recurrence === 'biweekly' ||
-      item.recurrence === 'monthly') &&
+      item.recurrence === 'monthly' ||
+      item.recurrence === 'custom') &&
+    (item.recurrence !== 'custom' ||
+      (typeof item.recurrenceInterval === 'number' &&
+        Number.isSafeInteger(item.recurrenceInterval) &&
+        item.recurrenceInterval >= 1 && item.recurrenceInterval <= 999 &&
+        (item.recurrenceUnit === 'days' || item.recurrenceUnit === 'weeks' ||
+          item.recurrenceUnit === 'months' || item.recurrenceUnit === 'years'))) &&
     (item.endDate === undefined || (typeof item.endDate === 'string' && isDateKey(item.endDate))) &&
     typeof item.effectiveDate === 'string' &&
     isDateKey(item.effectiveDate) &&
@@ -124,6 +133,13 @@ export function skipScheduledOccurrence(movementId: string, date: string): strin
 }
 
 export function occurrenceDateAt(movement: ScheduledMovement, index: number): string {
+  if (movement.recurrence === 'custom') {
+    const interval = movement.recurrenceInterval ?? 1
+    if (movement.recurrenceUnit === 'months') return addMonthsKey(movement.effectiveDate, index * interval)
+    if (movement.recurrenceUnit === 'years') return addMonthsKey(movement.effectiveDate, index * interval * 12)
+    return addDaysKey(movement.effectiveDate,
+      index * interval * (movement.recurrenceUnit === 'weeks' ? 7 : 1))
+  }
   if (movement.recurrence === 'monthly') return addMonthsKey(movement.effectiveDate, index)
   if (movement.recurrence === 'biweekly') {
     const monthOffset = Math.floor(index / 2)

@@ -37,6 +37,8 @@ export function ScheduledMovementForm({
   const [counterpartyAccountId, setCounterpartyAccountId] = useState('')
   const [startDate, setStartDate] = useState(addDaysKey(todayKey, 1))
   const [recurrence, setRecurrence] = useState<DraftMovement['recurrence']>(undefined)
+  const [recurrenceInterval, setRecurrenceInterval] = useState('1')
+  const [recurrenceUnit, setRecurrenceUnit] = useState<NonNullable<DraftMovement['recurrenceUnit']>>('months')
   const [endDateInput, setEndDateInput] = useState('')
   const [error, setError] = useState('')
   const firstCardCycle = type === 'expense' && cardId
@@ -64,6 +66,8 @@ export function ScheduledMovementForm({
     setCounterpartyAccountId(initial?.counterpartyAccountId ?? '')
     setStartDate(initial?.effectiveDate ?? addDaysKey(todayKey, 1))
     setRecurrence(initial?.recurrence)
+    setRecurrenceInterval(String(initial?.recurrenceInterval ?? 1))
+    setRecurrenceUnit(initial?.recurrenceUnit ?? 'months')
     setEndDateInput(initial?.endDate ?? '')
     setError('')
   }, [
@@ -95,6 +99,12 @@ export function ScheduledMovementForm({
       setError('Elige una fecha futura válida.')
       return
     }
+    const customInterval = Number(recurrenceInterval)
+    if (recurrence === 'custom' && (!Number.isSafeInteger(customInterval) ||
+      customInterval < 1 || customInterval > 999)) {
+      setError('Escribe un intervalo entre 1 y 999.')
+      return
+    }
     if (type === 'expense' && cardId) {
       const card = cards.find((item) => item.id === cardId)
       if (!card || !cycleForCardPurchase(ledger, cardId, effectiveDate) ||
@@ -121,6 +131,8 @@ export function ScheduledMovementForm({
         counterpartyAccountId: type === 'transfer' ? counterpartyAccountId : undefined,
         effectiveDate,
         recurrence,
+        recurrenceInterval: recurrence === 'custom' ? customInterval : undefined,
+        recurrenceUnit: recurrence === 'custom' ? recurrenceUnit : undefined,
         endDate: recurrence && endDateInput.trim() ? endDateInput.trim() : undefined,
         description: description.trim(),
       })
@@ -364,6 +376,10 @@ export function ScheduledMovementForm({
                 'monthly',
                 'Mensual',
               ],
+              [
+                'custom',
+                'Personalizado',
+              ],
             ] as const
           ).map(([value, label]) => (
             <Pressable
@@ -389,6 +405,30 @@ export function ScheduledMovementForm({
             </Pressable>
           ))}
         </ScrollView>
+        {recurrence === 'custom' && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9, marginTop: 14 }}>
+            <Text style={{ fontFamily: medium, color: MUTED, fontSize: 13 }}>Cada</Text>
+            <TextInput value={recurrenceInterval}
+              onChangeText={(value) => setRecurrenceInterval(value.replace(/\D/g, '').slice(0, 3))}
+              keyboardType='number-pad' accessibilityLabel='Intervalo de repetición'
+              style={{ minWidth: 42, borderBottomWidth: 1, borderBottomColor: '#ddd',
+                paddingVertical: 7, textAlign: 'center', fontFamily: medium, color: INK,
+                fontSize: 15 }} />
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ alignItems: 'center', gap: 6 }}>
+              {([['days', 'días'], ['weeks', 'semanas'], ['months', 'meses'],
+                ['years', 'años']] as const).map(([value, label]) => (
+                <Pressable key={value} onPress={() => setRecurrenceUnit(value)}
+                  accessibilityRole='button' accessibilityState={{ selected: recurrenceUnit === value }}
+                  style={{ paddingHorizontal: 10, paddingVertical: 8, borderRadius: 999,
+                    backgroundColor: recurrenceUnit === value ? INK : '#f3f3f3' }}>
+                  <Text style={{ fontFamily: medium, fontSize: 12,
+                    color: recurrenceUnit === value ? '#fff' : INK }}>{label}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        )}
         <View
           style={{
             flexDirection: 'row',
