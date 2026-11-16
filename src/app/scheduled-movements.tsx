@@ -5,7 +5,13 @@ import { Alert, Pressable, ScrollView, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { ScheduledMovementsList } from '@/components/finance/ScheduledMovementsList'
 import { localDateKey } from '@/features/finance/dates'
-import { getLedger, newMovementId, upsertCompletedMovement } from '@/features/finance/ledger'
+import {
+  completedScheduledOccurrenceKeys,
+  completeScheduledCardPurchase,
+  getLedger,
+  newMovementId,
+  upsertCompletedMovement,
+} from '@/features/finance/ledger'
 import {
   deleteScheduledMovement,
   getScheduledMovements,
@@ -35,12 +41,10 @@ export default function ScheduledMovementsScreen() {
     () =>
       new Set([
         ...skippedOccurrences,
-        ...ledger.completedMovements
-          .filter((item) => item.sourceScheduledId && item.sourceOccurrenceDate)
-          .map((item) => `${item.sourceScheduledId}:${item.sourceOccurrenceDate}`),
+        ...completedScheduledOccurrenceKeys(ledger),
       ]),
     [
-      ledger.completedMovements,
+      ledger,
       skippedOccurrences,
     ],
   )
@@ -90,10 +94,12 @@ export default function ScheduledMovementsScreen() {
   function completeMovement(movement: ScheduledMovement) {
     const occurrenceDate = nextOccurrenceDate(movement, completedOccurrences)
     const accountId = movement.accountId ?? ledger.accounts[0]?.id
-    if (!occurrenceDate || !accountId) return
+    if (!occurrenceDate || (!movement.cardId && !accountId)) return
     Alert.alert(
       'Registrar como realizado',
-      'Se aplicará al saldo actual y dejará de proyectarse.',
+      movement.cardId
+        ? 'Se registrará como compra en la tarjeta. La liquidez cambiará al pagar el ciclo.'
+        : 'Se aplicará al saldo actual y dejará de proyectarse.',
       [
         {
           text: 'Cancelar',
@@ -103,6 +109,11 @@ export default function ScheduledMovementsScreen() {
           text: 'Registrar',
           onPress: () => {
             try {
+              if (movement.cardId) {
+                setLedger(completeScheduledCardPurchase(movement, occurrenceDate, todayKey))
+                return
+              }
+              if (!accountId) throw new Error('Selecciona una cuenta.')
               setLedger(
                 upsertCompletedMovement(
                   {

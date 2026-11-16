@@ -68,7 +68,9 @@ export function projectLiquidityBreakdown(
           expenseCents: 0,
         }
         if (movement.type === 'income') change.incomeCents += movement.amountCents
-        if (movement.type === 'expense') change.expenseCents += movement.amountCents
+        if (movement.type === 'expense' && !movement.cardId) {
+          change.expenseCents += movement.amountCents
+        }
         changesByDate.set(occurrence, change)
       }
       if (!movement.recurrence) break

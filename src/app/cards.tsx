@@ -32,6 +32,7 @@ import {
   activateAutomaticBilling,
   type BillingCycle,
   type CardActivity,
+  completedScheduledOccurrenceKeys,
   confirmCycleStatement,
   createBillingCycle,
   createCreditCard,
@@ -41,6 +42,7 @@ import {
   newCardActivityId,
   newCardId,
   newCycleId,
+  projectedCardPayments,
   reassignInstallmentPurchase,
   reassignPurchase,
   scheduleCyclePayment,
@@ -48,6 +50,7 @@ import {
   updateCreditCardSettings,
 } from '@/features/finance/ledger'
 import { formatMoney, formatMoneyInput, parseAmount } from '@/features/finance/money'
+import { getScheduledMovements, getSkippedOccurrences } from '@/features/finance/scheduledMovements'
 
 const INK = '#101010'
 const MUTED = '#888'
@@ -178,6 +181,13 @@ export default function CardsScreen() {
   const progress = useSharedValue(ledger.accounts.length + Math.max(0,
     ledger.cards.findIndex((card) => card.id === focusedCardId)))
   const todayKey = localDateKey(new Date())
+  const projectedPayments = projectedCardPayments(
+    ledger,
+    getScheduledMovements(),
+    todayKey,
+    180,
+    new Set([...getSkippedOccurrences(), ...completedScheduledOccurrenceKeys(ledger)]),
+  )
   const selectedCard = ledger.cards.find((card) => card.id === selectedCardId)
   const selectedCycle = ledger.cycles.find((cycle) => cycle.id === selectedCycleId)
   const cycles = ledger.cycles
@@ -552,12 +562,11 @@ export default function CardsScreen() {
           const paymentCycle = cardCycles
             .filter((cycle) => statementAmountCents(ledger, cycle.id) > cycle.paidAmountCents)
             .sort((a, b) => comparePaymentCycles(a, b, todayKey))[0]
-          const nextPaymentCycle = [...cardCycles]
-            .filter((cycle) => cycle.dueDate >= todayKey &&
-              (cycle.paymentMode === 'automatic'
-                ? statementAmountCents(ledger, cycle.id)
-                : cycle.scheduledAmountCents) > cycle.paidAmountCents)
-            .sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0]
+          const nextPayment = projectedPayments
+            .filter((payment) => payment.date >= todayKey &&
+              cardCycles.some((cycle) => cycle.id === payment.cycleId))
+            .sort((a, b) => a.date.localeCompare(b.date))[0]
+          const nextPaymentCycle = cardCycles.find((cycle) => cycle.id === nextPayment?.cycleId)
           const nextCycle = nextPaymentCycle ?? purchaseCycle ?? paymentCycle
           const activity = ledger.cardActivity
             .filter((item) => item.cardId === card.id)
@@ -684,14 +693,11 @@ export default function CardsScreen() {
                       {nextCycle.cutoffDate < todayKey ? 'Próximo pago' : 'Siguiente corte'}
                     </Text>
                     <Text style={{ fontFamily: semibold, color: INK, fontSize: 22, marginTop: 4 }}>
-                      {formatMoney(Math.max(0,
-                        (nextCycle.paymentMode === 'automatic'
-                          ? statementAmountCents(ledger, nextCycle.id)
-                          : nextCycle.scheduledAmountCents) - nextCycle.paidAmountCents))}
+                      {formatMoney(nextPayment?.amountCents ?? 0)}
                     </Text>
                     <Text style={{ fontFamily: regular, color: MUTED, fontSize: 12, marginTop: 4 }}>
-                      Corte {formatShortDateKey(nextCycle.cutoffDate)} · Pago {formatShortDateKey(nextCycle.paymentMode === 'automatic'
-                        ? nextCycle.dueDate : nextCycle.scheduledDate ?? nextCycle.dueDate)}
+                      Corte {formatShortDateKey(nextCycle.cutoffDate)} · Pago {formatShortDateKey(
+                        nextPayment?.date ?? nextCycle.dueDate)}
                       {nextCycle.automatic && !nextCycle.dueDateConfirmed ? ' estimado' : ''}
                     </Text>
                   </View>

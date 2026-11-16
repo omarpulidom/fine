@@ -17,6 +17,8 @@ import { ScheduledMovementsList } from "@/components/finance/ScheduledMovementsL
 import { formatDateDisplay, localDateKey } from "@/features/finance/dates";
 import { liquidityHistory } from "@/features/finance/history";
 import {
+  completedScheduledOccurrenceKeys,
+  completeScheduledCardPurchase,
   getLedger,
   newMovementId,
   projectedCardPayments,
@@ -80,17 +82,13 @@ export default function HomeTab() {
     () =>
       new Set([
         ...skippedOccurrences,
-        ...ledger.completedMovements
-          .filter((item) => item.sourceScheduledId && item.sourceOccurrenceDate)
-          .map(
-            (item) => `${item.sourceScheduledId}:${item.sourceOccurrenceDate}`,
-          ),
+        ...completedScheduledOccurrenceKeys(ledger),
       ]),
-    [ledger.completedMovements, skippedOccurrences],
+    [ledger, skippedOccurrences],
   );
   const cardPayments = useMemo(
-    () => projectedCardPayments(ledger),
-    [ledger],
+    () => projectedCardPayments(ledger, movements, todayKey, horizonDays, completedOccurrences),
+    [ledger, movements, todayKey, horizonDays, completedOccurrences],
   );
   const projection = useMemo(
     () =>
@@ -259,10 +257,12 @@ export default function HomeTab() {
   function confirmCompleteMovement(movement: ScheduledMovement) {
     const occurrenceDate = nextOccurrenceDate(movement, completedOccurrences);
     const accountId = movement.accountId ?? ledger.accounts[0]?.id;
-    if (!occurrenceDate || !accountId) return;
+    if (!occurrenceDate || (!movement.cardId && !accountId)) return;
     Alert.alert(
       "Registrar como realizado",
-      "Se aplicará al saldo actual y dejará de proyectarse.",
+      movement.cardId
+        ? "Se registrará como compra en la tarjeta. La liquidez cambiará al pagar el ciclo."
+        : "Se aplicará al saldo actual y dejará de proyectarse.",
       [
         {
           text: "Cancelar",
@@ -272,6 +272,11 @@ export default function HomeTab() {
           text: "Registrar",
           onPress: () => {
             try {
+              if (movement.cardId) {
+                setLedger(completeScheduledCardPurchase(movement, occurrenceDate, todayKey));
+                return;
+              }
+              if (!accountId) throw new Error("Selecciona una cuenta.");
               setLedger(
                 upsertCompletedMovement(
                   {
@@ -694,7 +699,7 @@ export default function HomeTab() {
           <Pressable
             onPress={() => {
               if (!ledger.accounts.length) {
-                router.push("/accounts");
+                router.push("/add-instrument");
                 return;
               }
               router.push("/scheduled-movement-form");

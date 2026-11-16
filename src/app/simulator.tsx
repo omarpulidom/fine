@@ -10,7 +10,12 @@ import { AppBottomSheet } from '@/components/ui/AppBottomSheet'
 import { DateField } from '@/components/ui/DateField'
 import { addDaysKey, formatShortDateKey, localDateKey } from '@/features/finance/dates'
 import { allocateInstallments } from '@/features/finance/installments'
-import { getLedger, projectedCardPayments, totalLiquidity } from '@/features/finance/ledger'
+import {
+  completedScheduledOccurrenceKeys,
+  getLedger,
+  projectedCardPayments,
+  totalLiquidity,
+} from '@/features/finance/ledger'
 import { formatMoney, formatMoneyInput, parseAmount } from '@/features/finance/money'
 import { projectLiquidity } from '@/features/finance/projection'
 import { getScheduledMovements, getSkippedOccurrences } from '@/features/finance/scheduledMovements'
@@ -56,16 +61,14 @@ export default function SimulatorScreen() {
     () =>
       new Set([
         ...skippedOccurrences,
-        ...ledger.completedMovements
-          .filter((item) => item.sourceScheduledId && item.sourceOccurrenceDate)
-          .map((item) => `${item.sourceScheduledId}:${item.sourceOccurrenceDate}`),
+        ...completedScheduledOccurrenceKeys(ledger),
       ]),
     [
       ledger,
       skippedOccurrences,
     ],
   )
-  const cardPayments = projectedCardPayments(ledger)
+  const cardPayments = projectedCardPayments(ledger, movements, todayKey, 90, completed)
   const baseline = projectLiquidity(
     totalLiquidity(ledger),
     todayKey,

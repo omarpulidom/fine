@@ -15,14 +15,14 @@ import {
 export default function ScheduledMovementFormScreen() {
   const router = useRouter()
   const { movementId } = useLocalSearchParams<{ movementId?: string }>()
-  const [accounts, setAccounts] = useState(() => getLedger().accounts)
+  const [ledger, setLedger] = useState(getLedger)
   const [initial, setInitial] = useState<ScheduledMovement | null>(() =>
     getScheduledMovements().find((item) => item.id === movementId) ?? null,
   )
   const [todayKey, setTodayKey] = useState(() => localDateKey(new Date()))
 
   useFocusEffect(useCallback(() => {
-    setAccounts(getLedger().accounts)
+    setLedger(getLedger())
     setInitial(getScheduledMovements().find((item) => item.id === movementId) ?? null)
     setTodayKey(localDateKey(new Date()))
   }, [movementId]))
@@ -47,7 +47,7 @@ export default function ScheduledMovementFormScreen() {
         contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 12, paddingBottom: 48 }}>
         <ScheduledMovementForm
           todayKey={todayKey}
-          accounts={accounts}
+          ledger={ledger}
           initial={initial}
           onSave={save}
         />

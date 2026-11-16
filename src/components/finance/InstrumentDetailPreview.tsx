@@ -5,8 +5,15 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { getAccountDesign } from '@/features/finance/accountDesigns'
 import { getCardDesign } from '@/features/finance/cardDesigns'
 import { formatShortDateKey, localDateKey } from '@/features/finance/dates'
-import { type BillingCycle, type Ledger, statementAmountCents } from '@/features/finance/ledger'
+import {
+  type BillingCycle,
+  completedScheduledOccurrenceKeys,
+  type Ledger,
+  projectedCardPayments,
+  statementAmountCents,
+} from '@/features/finance/ledger'
 import { formatMoney } from '@/features/finance/money'
+import { getScheduledMovements, getSkippedOccurrences } from '@/features/finance/scheduledMovements'
 import type { Instrument } from './InstrumentCardCarousel'
 import { InstrumentDetailHeader } from './InstrumentDetailHeader'
 
@@ -50,17 +57,14 @@ export function InstrumentDetailPreview({
   const paymentCycle = cardCycles
     .filter((cycle) => statementAmountCents(ledger, cycle.id) > cycle.paidAmountCents)
     .sort((left, right) => comparePaymentCycles(left, right, todayKey))[0]
-  const nextPaymentCycle = [
-    ...cardCycles,
-  ]
-    .filter(
-      (cycle) =>
-        cycle.dueDate >= todayKey &&
-        (cycle.paymentMode === 'automatic'
-          ? statementAmountCents(ledger, cycle.id)
-          : cycle.scheduledAmountCents) > cycle.paidAmountCents,
-    )
-    .sort((left, right) => left.dueDate.localeCompare(right.dueDate))[0]
+  const nextPayment = card
+    ? projectedCardPayments(ledger, getScheduledMovements(), todayKey, 180,
+        new Set([...getSkippedOccurrences(), ...completedScheduledOccurrenceKeys(ledger)]))
+        .filter((payment) => payment.date >= todayKey &&
+          cardCycles.some((cycle) => cycle.id === payment.cycleId))
+        .sort((left, right) => left.date.localeCompare(right.date))[0]
+    : undefined
+  const nextPaymentCycle = cardCycles.find((cycle) => cycle.id === nextPayment?.cycleId)
   const nextCycle = nextPaymentCycle ?? purchaseCycle ?? paymentCycle
   const activity = account
     ? ledger.completedMovements
@@ -313,14 +317,7 @@ export function InstrumentDetailPreview({
                 marginTop: 4,
               }}
             >
-              {formatMoney(
-                Math.max(
-                  0,
-                  (nextCycle.paymentMode === 'automatic'
-                    ? statementAmountCents(ledger, nextCycle.id)
-                    : nextCycle.scheduledAmountCents) - nextCycle.paidAmountCents,
-                ),
-              )}
+              {formatMoney(nextPayment?.amountCents ?? 0)}
             </Text>
             <Text
               style={{
@@ -331,11 +328,7 @@ export function InstrumentDetailPreview({
               }}
             >
               Corte {formatShortDateKey(nextCycle.cutoffDate)} · Pago{' '}
-              {formatShortDateKey(
-                nextCycle.paymentMode === 'automatic'
-                  ? nextCycle.dueDate
-                  : (nextCycle.scheduledDate ?? nextCycle.dueDate),
-              )}
+              {formatShortDateKey(nextPayment?.date ?? nextCycle.dueDate)}
               {nextCycle.automatic && !nextCycle.dueDateConfirmed ? ' estimado' : ''}
             </Text>
           </View>

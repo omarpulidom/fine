@@ -1,16 +1,17 @@
 import { useEffect, useState } from 'react'
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native'
 import { DateField } from '@/components/ui/DateField'
-import { addDaysKey, isDateKey } from './dates'
-import type { LiquidAccount } from './ledger'
+import { addDaysKey, formatShortDateKey, isDateKey } from './dates'
+import type { Ledger } from './ledger'
 import { formatMoneyInput, parseAmount } from './money'
+import { cycleForCardPurchase } from './scheduledCardPurchases'
 import type { ScheduledMovement } from './scheduledMovements'
 
 type DraftMovement = Omit<ScheduledMovement, 'id'>
 
 type Props = {
   todayKey: string
-  accounts: LiquidAccount[]
+  ledger: Ledger
   initial?: ScheduledMovement | null
   onSave: (movement: DraftMovement) => void
 }
@@ -23,19 +24,24 @@ const semibold = 'Inter_600SemiBold'
 
 export function ScheduledMovementForm({
   todayKey,
-  accounts,
+  ledger,
   initial,
   onSave,
 }: Props) {
+  const { accounts, cards } = ledger
   const [type, setType] = useState<DraftMovement['type']>('expense')
   const [amount, setAmount] = useState('')
   const [description, setDescription] = useState('')
   const [accountId, setAccountId] = useState(accounts[0]?.id ?? '')
+  const [cardId, setCardId] = useState('')
   const [counterpartyAccountId, setCounterpartyAccountId] = useState('')
   const [startDate, setStartDate] = useState(addDaysKey(todayKey, 1))
   const [recurrence, setRecurrence] = useState<DraftMovement['recurrence']>(undefined)
   const [endDateInput, setEndDateInput] = useState('')
   const [error, setError] = useState('')
+  const firstCardCycle = type === 'expense' && cardId
+    ? cycleForCardPurchase(ledger, cardId, startDate)
+    : undefined
   const movementTypes: DraftMovement['type'][] =
     initial?.type === 'transfer'
       ? [
@@ -53,6 +59,7 @@ export function ScheduledMovementForm({
     setAmount(initial ? formatMoneyInput((initial.amountCents / 100).toFixed(2)) : '')
     setDescription(initial?.description ?? '')
     setAccountId(initial?.accountId ?? accounts[0]?.id ?? '')
+    setCardId(initial?.cardId ?? '')
     setCounterpartyAccountId(initial?.counterpartyAccountId ?? '')
     setStartDate(initial?.effectiveDate ?? addDaysKey(todayKey, 1))
     setRecurrence(initial?.recurrence)
@@ -72,7 +79,7 @@ export function ScheduledMovementForm({
       setError('Ingresa un importe mayor que cero.')
       return
     }
-    if (!accountId || !accounts.some((account) => account.id === accountId)) {
+    if (!cardId && (!accountId || !accounts.some((account) => account.id === accountId))) {
       setError('Selecciona una cuenta.')
       return
     }
@@ -83,6 +90,14 @@ export function ScheduledMovementForm({
     if (!isDateKey(effectiveDate) || effectiveDate <= todayKey) {
       setError('Elige una fecha futura válida.')
       return
+    }
+    if (type === 'expense' && cardId) {
+      const card = cards.find((item) => item.id === cardId)
+      if (!card || !cycleForCardPurchase(ledger, cardId, effectiveDate) ||
+        (recurrence && !card.billingRule)) {
+        setError('La tarjeta necesita ciclos de pago para programar esta compra.')
+        return
+      }
     }
     if (
       recurrence &&
@@ -97,7 +112,8 @@ export function ScheduledMovementForm({
       onSave({
         type,
         amountCents,
-        accountId,
+        accountId: type === 'expense' && cardId ? undefined : accountId,
+        cardId: type === 'expense' && cardId ? cardId : undefined,
         counterpartyAccountId: type === 'transfer' ? counterpartyAccountId : undefined,
         effectiveDate,
         recurrence,
@@ -131,7 +147,9 @@ export function ScheduledMovementForm({
             marginTop: 5,
           }}
         >
-          Solo se reflejará en la liquidez desde la fecha indicada.
+          {type === 'expense' && cardId
+            ? 'La compra aumentará la deuda; la liquidez bajará en la fecha límite de pago.'
+            : 'Solo se reflejará en la liquidez desde la fecha indicada.'}
         </Text>
 
         <View
@@ -144,7 +162,10 @@ export function ScheduledMovementForm({
           {movementTypes.map((value) => (
             <Pressable
               key={value}
-              onPress={() => setType(value)}
+              onPress={() => {
+                setType(value)
+                if (value !== 'expense') setCardId('')
+              }}
               style={{
                 flex: 1,
                 paddingVertical: 12,
@@ -202,7 +223,7 @@ export function ScheduledMovementForm({
             marginTop: 25,
           }}
         >
-          Cuenta
+          {type === 'expense' ? 'Medio de pago' : 'Cuenta'}
         </Text>
         <ScrollView
           horizontal
@@ -214,22 +235,44 @@ export function ScheduledMovementForm({
           {accounts.map((account) => (
             <Pressable
               key={account.id}
-              onPress={() => setAccountId(account.id)}
+              onPress={() => {
+                setAccountId(account.id)
+                setCardId('')
+              }}
               style={{
                 marginRight: 8,
                 paddingHorizontal: 14,
                 paddingVertical: 10,
                 borderRadius: 9,
-                backgroundColor: accountId === account.id ? INK : '#f3f3f3',
+                backgroundColor: !cardId && accountId === account.id ? INK : '#f3f3f3',
               }}
             >
               <Text
                 style={{
                   fontFamily: medium,
-                  color: accountId === account.id ? '#fff' : INK,
+                  color: !cardId && accountId === account.id ? '#fff' : INK,
                 }}
               >
                 {account.name}
+              </Text>
+            </Pressable>
+          ))}
+          {type === 'expense' && cards.map((card) => (
+            <Pressable
+              key={card.id}
+              onPress={() => setCardId(card.id)}
+              accessibilityRole='button'
+              accessibilityLabel={`Tarjeta de crédito ${card.name}`}
+              style={{
+                marginRight: 8,
+                paddingHorizontal: 14,
+                paddingVertical: 10,
+                borderRadius: 9,
+                backgroundColor: cardId === card.id ? INK : '#f3f3f3',
+              }}
+            >
+              <Text style={{ fontFamily: medium, color: cardId === card.id ? '#fff' : INK }}>
+                TC · {card.name}
               </Text>
             </Pressable>
           ))}
@@ -376,6 +419,12 @@ export function ScheduledMovementForm({
             />
           )}
         </View>
+        {firstCardCycle && (
+          <Text style={{ fontFamily: regular, color: MUTED, fontSize: 12, marginTop: 10 }}>
+            {recurrence ? 'Primer pago previsto' : 'Pago previsto'}: {' '}
+            {formatShortDateKey(firstCardCycle.dueDate)}
+          </Text>
+        )}
 
         <Text
           style={{

@@ -2,9 +2,10 @@ import { storageMMKV } from '@/lib/mmkv/stores'
 import type { AccountDesignId } from './accountDesigns'
 import type { CardDesignId } from './cardDesigns'
 import { cutoffForMonth, cycleDates, type BillingRule, previousCutoffMonth } from './billingCalendar'
-import { isDateKey, localDateKey } from './dates'
+import { addDaysKey, isDateKey, localDateKey } from './dates'
 import { allocateInstallments, type Installment } from './installments'
-import { getScheduledMovements } from './scheduledMovements'
+import { cycleForCardPurchase, scheduledCardChargesByCycle } from './scheduledCardPurchases'
+import { getScheduledMovements, type ScheduledMovement } from './scheduledMovements'
 
 const LEDGER_KEY = 'finance:ledger:v1'
 const LEGACY_BALANCE_KEY = 'finance:cash-account-balance-cents:v1'
@@ -68,6 +69,8 @@ export type CardActivity = {
   effectiveDate: string
   description: string
   installments?: Installment[]
+  sourceScheduledId?: string
+  sourceOccurrenceDate?: string
 }
 
 export type BalanceReconciliation = {
@@ -397,16 +400,57 @@ export function ensureBillingCalendar(ledger: Ledger, today: string): Ledger {
   return cycles.length === ledger.cycles.length ? ledger : persist({ ...ledger, cycles })
 }
 
-export function projectedCardPayments(ledger: Ledger): { date: string; amountCents: number }[] {
-  return ledger.cycles.flatMap((cycle) => {
+export function completedScheduledOccurrenceKeys(ledger: Ledger): string[] {
+  return [...ledger.completedMovements, ...ledger.cardActivity]
+    .filter((item) => item.sourceScheduledId && item.sourceOccurrenceDate)
+    .map((item) => `${item.sourceScheduledId}:${item.sourceOccurrenceDate}`)
+}
+
+export function projectedCardPayments(
+  ledger: Ledger,
+  movements: readonly ScheduledMovement[] = [],
+  todayKey = localDateKey(new Date()),
+  horizonDays = 180,
+  completedOccurrences: ReadonlySet<string> = new Set(),
+): { date: string; amountCents: number; cycleId: string }[] {
+  const futureCharges = scheduledCardChargesByCycle(
+    ledger, movements, addDaysKey(todayKey, horizonDays), completedOccurrences,
+  )
+  const payments = ledger.cycles.flatMap((cycle) => {
     const automatic = cycle.paymentMode === 'automatic'
-    const target = automatic
-      ? statementAmountCents(ledger, cycle.id)
-      : cycle.scheduledAmountCents
-    const amountCents = Math.max(0, target - cycle.paidAmountCents)
-    const date = automatic ? cycle.dueDate : cycle.scheduledDate
-    return date && amountCents > 0 ? [{ date, amountCents }] : []
+    const future = futureCharges.get(cycle.id) ?? 0
+    if (automatic) {
+      const amountCents = Math.max(0,
+        statementAmountCents(ledger, cycle.id) + future - cycle.paidAmountCents)
+      return amountCents > 0
+        ? [{ date: cycle.dueDate, amountCents, cycleId: cycle.id }]
+        : []
+    }
+    const actualScheduled = ledger.cardActivity
+      .filter((activity) => activity.type === 'purchase' &&
+        activity.cycleId === cycle.id && activity.sourceScheduledId)
+      .reduce((total, activity) => total + activity.amountCents, 0)
+    const manualAmount = Math.max(0, cycle.scheduledAmountCents - cycle.paidAmountCents)
+    const scheduledAmount = Math.max(0, future + actualScheduled -
+      Math.max(0, cycle.paidAmountCents - cycle.scheduledAmountCents))
+    return [
+      ...(cycle.scheduledDate && manualAmount > 0
+        ? [{ date: cycle.scheduledDate, amountCents: manualAmount, cycleId: cycle.id }]
+        : []),
+      ...(scheduledAmount > 0
+        ? [{ date: cycle.dueDate, amountCents: scheduledAmount, cycleId: cycle.id }]
+        : []),
+    ]
   })
+  const combined = new Map<string, (typeof payments)[number]>()
+  for (const payment of payments) {
+    const key = `${payment.cycleId}:${payment.date}`
+    const previous = combined.get(key)
+    combined.set(key, previous
+      ? { ...previous, amountCents: previous.amountCents + payment.amountCents }
+      : payment)
+  }
+  return [...combined.values()]
 }
 
 export function activateAutomaticBilling(cardId: string, nextDueDate: string): Ledger {
@@ -501,6 +545,9 @@ export function deleteCreditCard(cardId: string): Ledger {
   const ledger = getLedger()
   if (!ledger.cards.some((card) => card.id === cardId)) {
     throw new Error('No se encontró la tarjeta.')
+  }
+  if (getScheduledMovements().some((movement) => movement.cardId === cardId)) {
+    throw new Error('Esta tarjeta tiene compras programadas. Elimínalas o cámbialas primero.')
   }
   const cycleIds = new Set(
     ledger.cycles.filter((cycle) => cycle.cardId === cardId).map((cycle) => cycle.id),
@@ -647,6 +694,12 @@ export function addCardActivity(activity: CardActivity, todayKey: string): Ledge
     !Number.isSafeInteger(activity.amountCents) ||
     activity.amountCents <= 0 ||
     activity.effectiveDate < card.createdDate ||
+    (activity.sourceScheduledId && (!activity.sourceOccurrenceDate ||
+      !isDateKey(activity.sourceOccurrenceDate))) ||
+    (activity.sourceOccurrenceDate && !activity.sourceScheduledId) ||
+    (activity.sourceScheduledId && ledger.cardActivity.some((item) =>
+      item.sourceScheduledId === activity.sourceScheduledId &&
+      item.sourceOccurrenceDate === activity.sourceOccurrenceDate)) ||
     ledger.cardActivity.some((item) => item.id === activity.id)
   )
     throw new Error('Actividad inválida')
@@ -704,6 +757,30 @@ export function addCardActivity(activity: CardActivity, todayKey: string): Ledge
       activity,
     ],
   })
+}
+
+export function completeScheduledCardPurchase(
+  movement: ScheduledMovement,
+  occurrenceDate: string,
+  todayKey: string,
+): Ledger {
+  if (!movement.cardId || movement.type !== 'expense') {
+    throw new Error('Selecciona una compra programada con tarjeta.')
+  }
+  const ledger = getLedger()
+  const cycle = cycleForCardPurchase(ledger, movement.cardId, todayKey)
+  if (!cycle) throw new Error('La tarjeta no tiene un ciclo de pago para esta compra.')
+  return addCardActivity({
+    id: newCardActivityId(),
+    type: 'purchase',
+    cardId: movement.cardId,
+    cycleId: cycle.id,
+    amountCents: movement.amountCents,
+    effectiveDate: todayKey,
+    description: movement.description,
+    sourceScheduledId: movement.id,
+    sourceOccurrenceDate: occurrenceDate,
+  }, todayKey)
 }
 
 export function deleteCardActivity(id: string): Ledger {

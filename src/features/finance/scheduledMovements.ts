@@ -9,6 +9,7 @@ export type ScheduledMovement = {
   type: 'income' | 'expense' | 'transfer'
   amountCents: number
   accountId?: string
+  cardId?: string
   counterpartyAccountId?: string
   recurrence?: 'weekly' | 'biweekly' | 'monthly'
   endDate?: string
@@ -26,6 +27,10 @@ function isScheduledMovement(value: unknown): value is ScheduledMovement {
     Number.isSafeInteger(item.amountCents) &&
     item.amountCents > 0 &&
     (item.accountId === undefined || typeof item.accountId === 'string') &&
+    (item.cardId === undefined || typeof item.cardId === 'string') &&
+    (item.cardId === undefined ||
+      (item.type === 'expense' && item.accountId === undefined &&
+        item.counterpartyAccountId === undefined)) &&
     (item.counterpartyAccountId === undefined || typeof item.counterpartyAccountId === 'string') &&
     (item.recurrence === undefined ||
       item.recurrence === 'weekly' ||
@@ -114,4 +119,19 @@ export function nextOccurrenceDate(
     if (!movement.recurrence) return null
     index += 1
   }
+}
+
+export function occurrenceDatesThrough(movement: ScheduledMovement, lastDate: string): string[] {
+  const dates: string[] = []
+  let index = 0
+  let date = movement.effectiveDate
+  while (date <= lastDate && (!movement.endDate || date <= movement.endDate)) {
+    dates.push(date)
+    if (!movement.recurrence) break
+    index += 1
+    date = movement.recurrence === 'monthly'
+      ? addMonthsKey(movement.effectiveDate, index)
+      : addDaysKey(movement.effectiveDate, index * (movement.recurrence === 'weekly' ? 7 : 14))
+  }
+  return dates
 }

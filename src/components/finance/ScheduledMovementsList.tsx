@@ -4,8 +4,9 @@ import { useMemo, useState } from 'react'
 import { Pressable, ScrollView, Text, View } from 'react-native'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { formatShortDateKey } from '@/features/finance/dates'
-import { type Ledger, statementAmountCents } from '@/features/finance/ledger'
+import { type Ledger, projectedCardPayments } from '@/features/finance/ledger'
 import { formatMoney } from '@/features/finance/money'
+import { cycleForCardPurchase } from '@/features/finance/scheduledCardPurchases'
 import { nextOccurrenceDate, type ScheduledMovement } from '@/features/finance/scheduledMovements'
 
 type Filter = 'all' | 'income' | 'expense' | 'once' | 'weekly' | 'biweekly' | 'monthly'
@@ -74,15 +75,12 @@ export function ScheduledMovementsList({
           ]
         : []
     })
-    const cardItems: ListItem[] = ledger.cycles.flatMap((cycle) => {
-      const automatic = cycle.paymentMode === 'automatic'
-      const total = automatic
-        ? statementAmountCents(ledger, cycle.id)
-        : cycle.scheduledAmountCents
-      const amountCents = Math.max(0, total - cycle.paidAmountCents)
-      const date = automatic ? cycle.dueDate : cycle.scheduledDate
-      return amountCents > 0 && date
-        ? [{ kind: 'card', date, amountCents, cycle }]
+    const cardItems: ListItem[] = projectedCardPayments(
+      ledger, movements, todayKey, 180, completedOccurrences,
+    ).flatMap((payment) => {
+      const cycle = ledger.cycles.find((item) => item.id === payment.cycleId)
+      return cycle
+        ? [{ kind: 'card', date: payment.date, amountCents: payment.amountCents, cycle }]
         : []
     })
     return [
@@ -93,6 +91,7 @@ export function ScheduledMovementsList({
     movements,
     completedOccurrences,
     ledger,
+    todayKey,
   ])
   const selectedTypes = selectedFilters.filter((value): value is 'income' | 'expense' =>
     value === 'income' || value === 'expense')
@@ -146,8 +145,13 @@ export function ScheduledMovementsList({
     const amount = movement ? movement.amountCents : item.kind === 'card' ? item.amountCents : 0
     const accountId = movement?.accountId ??
       ledger.cards.find((card) => card.id === cycle?.cardId)?.paymentSourceAccountId
-    const accountName = ledger.accounts.find((account) => account.id === accountId)?.name
-    return { movement, cycle, type, title, amount, accountName }
+    const accountName = movement?.cardId
+      ? ledger.cards.find((card) => card.id === movement.cardId)?.name
+      : ledger.accounts.find((account) => account.id === accountId)?.name
+    const purchaseCycle = movement?.cardId
+      ? cycleForCardPurchase(ledger, movement.cardId, item.date)
+      : undefined
+    return { movement, cycle, type, title, amount, accountName, purchaseCycle }
   }
 
   return (
@@ -207,7 +211,7 @@ export function ScheduledMovementsList({
             const { movement, cycle, type, title, amount } = details(item)
             return (
               <Pressable
-                key={movement ? `movement-${movement.id}` : `card-${cycle?.id}`}
+                key={movement ? `movement-${movement.id}` : `card-${cycle?.id}-${item.date}`}
                 onPress={() => {
                   if (movement) onEdit(movement)
                   else if (cycle) onOpenCard(cycle.cardId)
@@ -229,7 +233,7 @@ export function ScheduledMovementsList({
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <View style={{ width: 30, height: 30, borderRadius: 15,
                     backgroundColor: '#f1f1f1', alignItems: 'center', justifyContent: 'center' }}>
-                    <FinanceIcon name={cycle ? 'credit-card' : type === 'income' ? 'arrow-down-left'
+                    <FinanceIcon name={cycle || movement?.cardId ? 'credit-card' : type === 'income' ? 'arrow-down-left'
                       : type === 'transfer' ? 'repeat' : 'arrow-up-right'} size={15} color={ink} />
                   </View>
                   <Text numberOfLines={1}
@@ -262,7 +266,7 @@ export function ScheduledMovementsList({
                   </Text>
                   <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
                     <Text style={{ color: muted, fontFamily: regular, fontSize: 21 }}>
-                      {type === 'income' ? '+' : type === 'transfer' ? '↔' : '−'}
+                      {movement?.cardId ? '' : type === 'income' ? '+' : type === 'transfer' ? '↔' : '−'}
                     </Text>
                     <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}
                       style={{ flex: 1, color: ink, fontFamily: medium, fontSize: 21 }}>
@@ -305,11 +309,11 @@ export function ScheduledMovementsList({
         </ScrollView>
       ) : (
         visibleItems.map((item, index) => {
-          const { movement, cycle, type, title, amount, accountName } = details(item)
+          const { movement, cycle, type, title, amount, accountName, purchaseCycle } = details(item)
           const startsDateGroup = index === 0 || visibleItems[index - 1].date !== item.date
           return (
             <View
-              key={movement ? `movement-${movement.id}` : `card-${cycle?.id}`}
+              key={movement ? `movement-${movement.id}` : `card-${cycle?.id}-${item.date}`}
             >
               {startsDateGroup && (
                 <Text style={{ color: muted, fontFamily: regular, fontSize: 13,
@@ -327,7 +331,8 @@ export function ScheduledMovementsList({
                   else if (cycle) onOpenCard(cycle.cardId)
                 }}
                 accessibilityRole='button'
-                accessibilityLabel={`${title}, ${type === 'income' ? 'más' : 'menos'} ${formatMoney(amount)}`}
+                accessibilityLabel={`${title}, ${movement?.cardId ? 'compra con tarjeta' :
+                  type === 'income' ? 'más' : 'menos'} ${formatMoney(amount)}`}
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
@@ -358,7 +363,7 @@ export function ScheduledMovementsList({
                   }}
                 >
                   <Text style={{ fontFamily: regular, color: muted }}>
-                    {type === 'income' ? '+' : type === 'transfer' ? '↔' : '−'}
+                    {movement?.cardId ? '' : type === 'income' ? '+' : type === 'transfer' ? '↔' : '−'}
                   </Text>
                   {formatMoney(amount)}
                 </Text>
@@ -367,6 +372,7 @@ export function ScheduledMovementsList({
                 fontSize: 12, marginTop: 4 }}>
                 {[movement ? recurrenceLabel(movement) ?? 'Único' : 'Tarjeta de crédito',
                   accountName,
+                  purchaseCycle ? `Pago ${formatShortDateKey(purchaseCycle.dueDate)}` : null,
                 ].filter(Boolean).join(' · ')}
               </Text>
               <View
