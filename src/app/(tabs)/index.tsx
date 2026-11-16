@@ -555,7 +555,7 @@ export default function HomeTab() {
                     flexDirection: "row",
                     justifyContent: "center",
                     gap: 20,
-                    marginTop: 0,
+                    marginTop: -32,
                   }}
                 >
                   {(
@@ -598,7 +598,7 @@ export default function HomeTab() {
                     flexDirection: "row",
                     justifyContent: "center",
                     gap: 8,
-                    marginTop: 8,
+                    marginTop: 20,
                     paddingBottom: 8,
                   }}
                 >
