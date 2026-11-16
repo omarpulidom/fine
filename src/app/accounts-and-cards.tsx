@@ -139,7 +139,7 @@ export default function AccountsAndCardsScreen() {
         }}
       >
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => router.dismissTo('/(tabs)')}
           accessibilityRole='button'
           accessibilityLabel='Volver'
           style={{

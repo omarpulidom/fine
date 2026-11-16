@@ -20,6 +20,7 @@ import { useSharedValue } from 'react-native-reanimated'
 import { AppBottomSheet } from '@/components/ui/AppBottomSheet'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { InstrumentCardCarousel } from '@/components/finance/InstrumentCardCarousel'
+import type { Instrument } from '@/components/finance/InstrumentCardCarousel'
 import { InstrumentDetailHeader } from '@/components/finance/InstrumentDetailHeader'
 import { InstrumentDetailMorph } from '@/components/finance/InstrumentDetailMorph'
 import { useInstrumentDetailTransition } from '@/components/finance/InstrumentDetailTransition'
@@ -49,14 +50,16 @@ export default function AccountsScreen() {
   const router = useRouter()
   const { width: screenWidth } = useWindowDimensions()
   const designPageWidth = screenWidth - 48
-  const { accountId, create, swipe, fromList } = useLocalSearchParams<{
+  const { accountId, create, swipe, fromList, returnTo } = useLocalSearchParams<{
     accountId?: string
     create?: string
     swipe?: string
     fromList?: string
+    returnTo?: string
   }>()
   const { hasListOrigin, closeToList } = useInstrumentDetailTransition()
   const [ledger, setLedger] = useState(getLedger)
+  const [pendingDeletion, setPendingDeletion] = useState<{ id: string; target: Instrument } | null>(null)
   useFocusEffect(useCallback(() => setLedger(getLedger()), []))
   const [editing, setEditing] = useState<LiquidAccount | null | undefined>(
     create === '1' ? null : undefined,
@@ -83,7 +86,9 @@ export default function AccountsScreen() {
       image: getAccountDesign(selectedAccount.accountDesignId)?.image,
       navigate: () => router.back(),
     })) return
-    if (accountId || create === '1') router.back()
+    if (returnTo === 'movements') router.dismissTo('/movements')
+    else if (create === '1' || returnTo === 'accounts-and-cards') router.dismissTo('/accounts-and-cards')
+    else if (accountId) router.back()
     else router.replace('/accounts-and-cards')
   }
 
@@ -133,7 +138,13 @@ export default function AccountsScreen() {
         }),
       )
       setEditing(undefined)
-      if (!editing) router.replace({ pathname: '/accounts', params: { accountId: savedId } })
+      if (!editing) router.replace({
+        pathname: '/accounts',
+        params: {
+          accountId: savedId,
+          ...(create === '1' ? { returnTo: returnTo ?? 'accounts-and-cards' } : {}),
+        },
+      })
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'No se pudo guardar la cuenta.')
     }
@@ -153,9 +164,19 @@ export default function AccountsScreen() {
           style: 'destructive',
           onPress: () => {
             try {
-              setLedger(deleteAccount(account.id))
-              setEditing(undefined)
-              router.replace('/accounts-and-cards')
+              const instruments: Instrument[] = [
+                ...ledger.accounts.map((item) => ({ id: item.id, kind: 'account' as const })),
+                ...ledger.cards.map((item) => ({ id: item.id, kind: 'card' as const })),
+              ]
+              const index = instruments.findIndex((item) => item.id === account.id && item.kind === 'account')
+              const target = instruments[index + 1] ?? instruments[index - 1]
+              if (target && selectedAccount?.id === account.id) {
+                setPendingDeletion({ id: account.id, target })
+              } else {
+                setLedger(deleteAccount(account.id))
+                setEditing(undefined)
+                if (!target) router.dismissTo('/accounts-and-cards')
+              }
             } catch (caught) {
               Alert.alert(
                 'No se puede eliminar',
@@ -472,7 +493,21 @@ export default function AccountsScreen() {
       >
         {!!accountId && (
           <InstrumentCardCarousel ledger={ledger} instrumentId={accountId} kind='account'
-            progress={progress} />
+            progress={progress} transitionTo={pendingDeletion?.target} returnTo={returnTo}
+            onTransitionEnd={() => {
+              if (!pendingDeletion) return
+              const { id, target } = pendingDeletion
+              try {
+                setLedger(deleteAccount(id))
+                setEditing(undefined)
+                setPendingDeletion(null)
+                if (target.kind === 'account') router.setParams({ accountId: target.id })
+                else router.replace({ pathname: '/cards', params: { cardId: target.id, swipe: '1', ...(returnTo ? { returnTo } : {}) } })
+              } catch (caught) {
+                setPendingDeletion(null)
+                Alert.alert('No se puede eliminar', caught instanceof Error ? caught.message : 'Inténtalo de nuevo.')
+              }
+            }} />
         )}
         {selectedAccount ? (
           <InstrumentDetailMorph ledger={ledger} instrumentId={selectedAccount.id}

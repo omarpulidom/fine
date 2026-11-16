@@ -71,6 +71,7 @@ export default function AddInstrumentScreen() {
               pathname: '/accounts',
               params: {
                 create: '1',
+                returnTo: 'accounts-and-cards',
               },
             })
           }
@@ -84,6 +85,7 @@ export default function AddInstrumentScreen() {
               pathname: '/cards',
               params: {
                 create: '1',
+                returnTo: 'accounts-and-cards',
               },
             })
           }

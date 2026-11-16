@@ -20,6 +20,7 @@ import { AppBottomSheet } from '@/components/ui/AppBottomSheet'
 import { DateField } from '@/components/ui/DateField'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { InstrumentCardCarousel } from '@/components/finance/InstrumentCardCarousel'
+import type { Instrument } from '@/components/finance/InstrumentCardCarousel'
 import { InstrumentDetailHeader } from '@/components/finance/InstrumentDetailHeader'
 import { InstrumentDetailMorph } from '@/components/finance/InstrumentDetailMorph'
 import { useInstrumentDetailTransition } from '@/components/finance/InstrumentDetailTransition'
@@ -138,14 +139,16 @@ export default function CardsScreen() {
   const router = useRouter()
   const { width: screenWidth } = useWindowDimensions()
   const designPageWidth = screenWidth - 48
-  const { cardId: focusedCardId, create, swipe, fromList } = useLocalSearchParams<{
+  const { cardId: focusedCardId, create, swipe, fromList, returnTo } = useLocalSearchParams<{
     cardId?: string
     create?: string
     swipe?: string
     fromList?: string
+    returnTo?: string
   }>()
   const { hasListOrigin, closeToList } = useInstrumentDetailTransition()
   const [ledger, setLedger] = useState(getLedger)
+  const [pendingDeletion, setPendingDeletion] = useState<{ id: string; target: Instrument } | null>(null)
   useFocusEffect(
     useCallback(() => {
       setLedger(getLedger())
@@ -213,8 +216,9 @@ export default function CardsScreen() {
       image: getCardDesign(card.cardDesignId)?.image,
       navigate: () => router.back(),
     })) return
-    if (focusedCardId || create === '1') router.back()
-    else router.replace('/accounts-and-cards')
+    if (returnTo === 'accounts-and-cards') router.dismissTo('/accounts-and-cards')
+    else if (focusedCardId || create === '1') router.back()
+    else router.dismissTo('/accounts-and-cards')
   }
 
   function open(
@@ -352,7 +356,10 @@ export default function CardsScreen() {
                 },
           ),
         )
-        router.replace({ pathname: '/cards', params: { cardId: id } })
+        router.replace({ pathname: '/cards', params: {
+          cardId: id,
+          ...(create === '1' ? { returnTo: returnTo ?? 'accounts-and-cards' } : {}),
+        } })
       } else if (mode === 'settings') {
         if (!selectedCard) throw new Error('Selecciona una tarjeta.')
         if (!selectedCard.billingRule && (!isDateKey(dueDate) || dueDate <= todayKey)) {
@@ -495,10 +502,20 @@ export default function CardsScreen() {
           style: 'destructive',
           onPress: () => {
             try {
-              setLedger(deleteCreditCard(cardId))
-              setSelectedCardId('')
-              setSelectedCycleId('')
-              router.replace('/accounts-and-cards')
+              const instruments: Instrument[] = [
+                ...ledger.accounts.map((item) => ({ id: item.id, kind: 'account' as const })),
+                ...ledger.cards.map((item) => ({ id: item.id, kind: 'card' as const })),
+              ]
+              const index = instruments.findIndex((item) => item.id === cardId && item.kind === 'card')
+              const target = instruments[index + 1] ?? instruments[index - 1]
+              if (target && focusedCardId === cardId) {
+                setPendingDeletion({ id: cardId, target })
+              } else {
+                setLedger(deleteCreditCard(cardId))
+                setSelectedCardId('')
+                setSelectedCycleId('')
+                if (!target) router.dismissTo('/accounts-and-cards')
+              }
             } catch (caught) {
               Alert.alert(
                 'No se puede eliminar',
@@ -550,7 +567,22 @@ export default function CardsScreen() {
         )}
         {!!focusedCardId && (
           <InstrumentCardCarousel ledger={ledger} instrumentId={focusedCardId} kind='card'
-            progress={progress} />
+            progress={progress} transitionTo={pendingDeletion?.target} returnTo={returnTo}
+            onTransitionEnd={() => {
+              if (!pendingDeletion) return
+              const { id, target } = pendingDeletion
+              try {
+                setLedger(deleteCreditCard(id))
+                setPendingDeletion(null)
+                setSelectedCardId('')
+                setSelectedCycleId('')
+                if (target.kind === 'card') router.setParams({ cardId: target.id })
+                else router.replace({ pathname: '/accounts', params: { accountId: target.id, swipe: '1', ...(returnTo ? { returnTo } : {}) } })
+              } catch (caught) {
+                setPendingDeletion(null)
+                Alert.alert('No se puede eliminar', caught instanceof Error ? caught.message : 'Inténtalo de nuevo.')
+              }
+            }} />
         )}
         {!!visibleCards.length && focusedCardId && (
           <InstrumentDetailMorph ledger={ledger} instrumentId={focusedCardId}

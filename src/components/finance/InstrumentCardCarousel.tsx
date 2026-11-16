@@ -17,16 +17,23 @@ export function InstrumentCardCarousel({
   instrumentId,
   kind,
   progress,
+  transitionTo,
+  onTransitionEnd,
+  returnTo,
 }: {
   ledger: Ledger
   instrumentId: string
   kind: Instrument['kind']
   progress: SharedValue<number>
+  transitionTo?: Instrument | null
+  onTransitionEnd?: () => void
+  returnTo?: string
 }) {
   const router = useRouter()
   const { width } = useWindowDimensions()
   const scrollRef = useRef<ScrollView>(null)
   const navigating = useRef<string | null>(null)
+  const transitionHandled = useRef(false)
   const instruments = useMemo<Instrument[]>(
     () => [
       ...ledger.accounts.map((account) => ({
@@ -66,6 +73,27 @@ export function InstrumentCardCarousel({
     progress,
   ])
 
+  useEffect(() => {
+    if (!transitionTo) return
+    transitionHandled.current = false
+    const targetIndex = instruments.findIndex((item) =>
+      item.id === transitionTo.id && item.kind === transitionTo.kind)
+    if (targetIndex >= 0) scrollRef.current?.scrollTo({ x: targetIndex * interval, animated: true })
+  }, [transitionTo, instruments, interval])
+
+  const finishPage = (page: number) => {
+    if (transitionTo) {
+      const target = instruments[page]
+      if (!transitionHandled.current && target?.id === transitionTo.id &&
+        target.kind === transitionTo.kind) {
+        transitionHandled.current = true
+        onTransitionEnd?.()
+      }
+      return
+    }
+    selectPage(page)
+  }
+
   const selectPage = useCallback(
     (index: number) => {
       const target = instruments[index]
@@ -89,6 +117,7 @@ export function InstrumentCardCarousel({
                 params: {
                   accountId: target.id,
                   swipe: '1',
+                  ...(returnTo ? { returnTo } : {}),
                 },
               }
             : {
@@ -96,6 +125,7 @@ export function InstrumentCardCarousel({
                 params: {
                   cardId: target.id,
                   swipe: '1',
+                  ...(returnTo ? { returnTo } : {}),
                 },
               },
         )
@@ -106,6 +136,7 @@ export function InstrumentCardCarousel({
       instruments,
       kind,
       router,
+      returnTo,
       selectedIndex,
     ],
   )
@@ -145,14 +176,14 @@ export function InstrumentCardCarousel({
       onMomentumScrollEnd={(event) => {
         const page = Math.round(event.nativeEvent.contentOffset.x / interval)
         progress.value = page
-        selectPage(page)
+        finishPage(page)
       }}
       onScrollEndDrag={(event) => {
         const offset = event.nativeEvent.contentOffset.x
         const page = Math.round(offset / interval)
         if (Math.abs(offset - page * interval) < 5) {
           progress.value = page
-          selectPage(page)
+          finishPage(page)
         }
       }}
     >

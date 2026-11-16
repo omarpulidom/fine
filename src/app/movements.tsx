@@ -190,7 +190,7 @@ export default function MovementsScreen() {
           Los movimientos realizados cambian el saldo actual de su cuenta una sola vez.
         </Text>
         <Pressable
-          onPress={() => (ledger.accounts.length ? open(null) : router.push({ pathname: '/accounts', params: { create: '1' } }))}
+          onPress={() => (ledger.accounts.length ? open(null) : router.push({ pathname: '/accounts', params: { create: '1', returnTo: 'movements' } }))}
           style={{
             marginTop: 26,
             height: 52,
