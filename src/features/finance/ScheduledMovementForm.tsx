@@ -54,6 +54,7 @@ export function ScheduledMovementForm({
           'income',
         ]
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Initialize a new draft only when switching movements, preserving edits during ledger refreshes.
   useEffect(() => {
     setType(initial?.type ?? 'expense')
     setAmount(initial ? formatMoneyInput((initial.amountCents / 100).toFixed(2)) : '')
@@ -66,10 +67,13 @@ export function ScheduledMovementForm({
     setEndDateInput(initial?.endDate ?? '')
     setError('')
   }, [
-    accounts,
-    initial,
-    todayKey,
+    initial?.id,
   ])
+
+  useEffect(() => {
+    setAccountId((current) => current && accounts.some((account) => account.id === current)
+      ? current : accounts[0]?.id ?? '')
+  }, [accounts])
 
   function save() {
     const amountCents = parseAmount(amount)
