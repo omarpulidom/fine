@@ -1,6 +1,6 @@
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker'
-import { useRef, useState } from 'react'
-import { Platform, Pressable, type StyleProp, Text, View, type ViewStyle } from 'react-native'
+import { useEffect, useRef, useState } from 'react'
+import { Keyboard, Platform, Pressable, type StyleProp, Text, View, type ViewStyle } from 'react-native'
 import { AppBottomSheet } from '@/components/ui/AppBottomSheet'
 import { formatDateDisplay, isDateKey, localDateKey } from '@/features/finance/dates'
 
@@ -34,26 +34,42 @@ export function DateField({
   const [visible, setVisible] = useState(false)
   const [draft, setDraft] = useState(new Date())
   const pendingDate = useRef<string | null>(null)
+  const keyboardHideSubscription = useRef<ReturnType<typeof Keyboard.addListener> | null>(null)
   const min = minimumDate ? toDate(minimumDate) : undefined
   const max = maximumDate ? toDate(maximumDate) : undefined
+
+  useEffect(() => () => keyboardHideSubscription.current?.remove(), [])
 
   function open() {
     let initial = toDate(value) ?? min ?? new Date()
     if (min && initial < min) initial = min
     if (max && initial > max) initial = max
-    if (Platform.OS === 'android') {
-      DateTimePickerAndroid.open({
-        value: initial,
-        mode: 'date',
-        minimumDate: min,
-        maximumDate: max,
-        onChange: (event, selected) => {
-          if (event.type === 'set' && selected) onChange(localDateKey(selected))
-        },
+    const showPicker = () => {
+      if (Platform.OS === 'android') {
+        DateTimePickerAndroid.open({
+          value: initial,
+          mode: 'date',
+          minimumDate: min,
+          maximumDate: max,
+          onChange: (event, selected) => {
+            if (event.type === 'set' && selected) onChange(localDateKey(selected))
+          },
+        })
+      } else {
+        setDraft(initial)
+        setVisible(true)
+      }
+    }
+    if (Keyboard.isVisible()) {
+      keyboardHideSubscription.current?.remove()
+      keyboardHideSubscription.current = Keyboard.addListener('keyboardDidHide', () => {
+        keyboardHideSubscription.current?.remove()
+        keyboardHideSubscription.current = null
+        showPicker()
       })
+      Keyboard.dismiss()
     } else {
-      setDraft(initial)
-      setVisible(true)
+      showPicker()
     }
   }
 
