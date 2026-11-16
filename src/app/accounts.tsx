@@ -291,14 +291,6 @@ export default function AccountsScreen() {
                         aspectRatio: 817 / 511,
                         borderRadius: 16,
                         backgroundColor: '#fff',
-                        shadowColor: '#000',
-                        shadowOffset: {
-                          width: 0,
-                          height: 6,
-                        },
-                        shadowOpacity: 0.12,
-                        shadowRadius: 14,
-                        elevation: 5,
                       }}
                     >
                       <Pressable
